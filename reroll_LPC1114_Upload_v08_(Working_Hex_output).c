@@ -74,9 +74,7 @@ static unsigned char Ascii2Hex(unsigned char c)
 //Convert file to one long char array.
 int hexFileToCharArray()
 {
-	unsigned char hexValue1;
-	unsigned char hexValue2;
-	unsigned char hexValue3;
+	unsigned char hexValue;
 
 	//To count through all characters in the file.
 	int i = 0;
@@ -100,17 +98,17 @@ int hexFileToCharArray()
 		}
 		
 		//Put first nibble in.
-		hexValue1 = (Ascii2Hex(charToPut));
+		hexValue = (Ascii2Hex(charToPut));
 		//Slide the nibble.
-		hexValue1 <<= 4;
+		hexValue <<= 4;
 		//Put second nibble in.
 		charToPut = fgetc (fileIn);
 		
 		//Put the nibbles together.
-		hexValue1 |= (Ascii2Hex(charToPut));
+		hexValue |= (Ascii2Hex(charToPut));
 
 		//Store the completed hex value in the char array.
-		arrayForFileChar[i] = (hexValue1);
+		arrayForFileChar[i] = (hexValue);
 		i++;
 
 	}
@@ -150,12 +148,6 @@ int main(int argc, char *argv[])
 
 	//Convert file to one long char array.
 	hexFileToCharArray();
-
-	char print[20];
-
-	sprintf(print, "%d", fileSize);
-
-	puts(print);
 
 	//Prints out each byte, one at a time.
 	for (int i = 0; i < fileSize; i++){

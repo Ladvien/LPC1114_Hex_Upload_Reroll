@@ -83,35 +83,33 @@ int hexFileToCharArray()
 
 	//Loop through each character until EOF.
 	while((charToPut = fgetc (fileIn))  != 0xFF ){
-
+		
+		//Removes "\r"
 		if (charToPut == '\r'){
-			putchar('R');
 			charToPut = fgetc (fileIn);
 			continue;
 		}
+		//Removes "\n"
 		if (charToPut == '\n'){
-			putchar('N');
 			charToPut = fgetc (fileIn);
 			continue;
 		}
 		//Removes ":"
 		if (charToPut == ':'){
-			putchar(':');
 			charToPut = fgetc (fileIn);
 		}
 		
+		//Put first nibble in.
 		hexValue1 = (Ascii2Hex(charToPut));
+		//Slide the nibble.
 		hexValue1 <<= 4;
-		
+		//Put second nibble in.
 		charToPut = fgetc (fileIn);
 		
-		if (charToPut == ':'){
-			putchar(':');
-			charToPut = fgetc (fileIn);
-		}
-
+		//Put the nibbles together.
 		hexValue1 |= (Ascii2Hex(charToPut));
 
+		//Store the completed hex value in the char array.
 		arrayForFileChar[i] = (hexValue1);
 		i++;
 

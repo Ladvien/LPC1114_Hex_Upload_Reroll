@@ -152,23 +152,22 @@ int hexFileToCharArray()
 		//RECORD TYPE
 		fhexRecordType[i] = readByte();	
 		
-		
+		//Throws the byte count (data bytes in this line) into an integer.
 		charsThisLine = fhexByteCount[i];
-		if(charsThisLine > 16){
-			fhexByteCount[i] <<=4;
-			fhexByteCount[i] >>=4;
-			charsThisLine = fhexByteCount[i];
-			printf("\n\nBOO!\n\n");
-		}
+
+
 		
 		//////// DATA ///////////////////
 		while (hexDataIndex != charsThisLine && totalCharsRead  < fileSize && charsThisLine != 0x00)
 		{
 			//Store the completed hex value in the char array.
 			arrayForFileChar[dataSize] = readByte();
+			//Index for data.
 			dataSize++;
+			//Index for loop.
 			hexDataIndex++;
 		}
+		//Reset loop index.
 		hexDataIndex=0;
 		
 		//////// CHECK SUM //////////////
@@ -212,36 +211,39 @@ int main(int argc, char *argv[])
 	//Setup serial port, even though we are banging.
     FT_SetBaudRate(handle, 9600);  //* Actually 9600 * 16
 
+	//Sizes file to be used in data handling.
 	fileSizer();
 
 	//Convert file to one long char array.
 	hexFileToCharArray();
 	
 	printf("\n\nHex output file\n\n");
-	//printf("\nChars a line: %i\n ", charsThisLine);
 	
 	//Used for indexing data bytes in for-loop.
 	int dataPerLineIndex = 0;
 	
 	//Loops through each line, until the line count and index are equal.
 	for(int lineIndex = 0; lineIndex != hexFileLineCount; ++lineIndex){
+		
 		//Converts this line byte count into an integer.
 		charsThisLine = fhexByteCount[lineIndex];
+		
 		//Loops through printing data bytes until byte count 
 		//for this line and index are equal.
 		for(int charsOnThisLineIndex = 0; charsOnThisLineIndex != charsThisLine; charsOnThisLineIndex++)
 		{
 			// Print the bytes.
-		   printf("%2x ", arrayForFileChar[dataPerLineIndex]);
-		   //Increases overall data index.
-		   dataPerLineIndex++;
+			printf("%2x ", arrayForFileChar[dataPerLineIndex]);
+			//Increases overall data index.
+			dataPerLineIndex++;
 		}
 		//Print data bytes on this line.
 		printf(" #%i\n", (charsThisLine));
-		//printf("0x%2x \n", fhexByteCount[lineIndex]);
+
 	}
-	printf(" %i\n", fileSize);
-	printf(" #%i\n", ((totalCharsRead)));
+	//Prints fileSize and totalCharsRead for user.
+	printf("\nFile Size : %i\n", fileSize);
+	printf("Chars Read: %i\n", ((totalCharsRead)));
 			
 	//Prints out each byte, one at a time.
 	for (int i = 0; i < dataSize; i++){

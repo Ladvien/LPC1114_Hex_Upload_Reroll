@@ -31,43 +31,30 @@ FT_HANDLE handle;
 //File to be loaded.	
 FILE *fileIn;
 int fileSize = 0;
-
-
-// 1. Load HEX File
-//	a. Find length of file.
-//	b. Convert each character from ASCII to HEX.
-//	c. Create arrays for  (e.g., http://en.wikipedia.org/wiki/Intel_HEX)
-
-
-/////////// Hex file to UUE stuff /////////////////
-//To hold file hex values.
-unsigned char fileData_Hex_String[MAX_SIZE];
-unsigned char UUEData[MAX_SIZE];
-
-unsigned char fhexByteCount[MAX_SIZE];
-unsigned char fhexAddress1[MAX_SIZE];
-unsigned char fhexAddress2[MAX_SIZE];
-unsigned char fhexRecordType[MAX_SIZE];
-unsigned char fhexCheckSum[MAX_SIZE];
-//Holds combined nibbles.
-unsigned char hexValue;
+char * fileCharPoint;
 
 //Reading characters from a file.
 unsigned char charToPut;
-//Holds line count.
-int hexFileLineCount = 0;
+
 //Total bytesRead.
 int totalCharsRead = 0;
-char * fileCharPoint;
-int charsThisLine;
 
-int UUEDataSize = 0;
+struct hexFile {
 
-/////////////////////////////////////////////////
+	//To hold file hex values.
+	unsigned char fileData_Hex_String[MAX_SIZE];
+	int fileData_Hex_String_Size;
+	unsigned char fhexByteCount[MAX_SIZE];
+	unsigned char fhexAddress1[MAX_SIZE];
+	unsigned char fhexAddress2[MAX_SIZE];
+	unsigned char fhexRecordType[MAX_SIZE];
+	unsigned char fhexCheckSum[MAX_SIZE];
 
-//Used to know the size of fileData_Hex_String.
-int dataSize;
+};
 
+
+
+///////////////////// PROGRAM ////////////////////////////
 
 //Open file for reading, function.
 static FILE *open_file ( char *file, char *mode )
@@ -83,7 +70,7 @@ static FILE *open_file ( char *file, char *mode )
 }
 
 
-void encode2(unsigned char fileData_Hex_String[], int hexDataCharCount)
+void UUencode(unsigned char fileData_Hex_String[], int hexDataCharCount)
 {
 	// ASCII->HEX->UUE Test Strings
 	// ASCII: The witch Lilith knows my soul.
@@ -98,8 +85,6 @@ void encode2(unsigned char fileData_Hex_String[], int hexDataCharCount)
 
 	int paddedIndex = 0;
 	int UUE_Encoded_String_Index = 0;
-
-	//hexDataCharCount = 8;
 
 	for(int hexDataIndex = 0;  hexDataIndex < hexDataCharCount; hexDataIndex)
 	{
@@ -132,12 +117,15 @@ void encode2(unsigned char fileData_Hex_String[], int hexDataCharCount)
 			UUE_Encoded_String_Index++;
 		}
 	}
-	printf("%i\n", (UUE_Encoded_String_Index-paddedIndex));
+	
+	// ADD FOR-LOOP TO DIVIDE UUE DATA INTO 61 CHAR STRINGS.
+
+	/*
 	for (int i = 0; i < (UUE_Encoded_String_Index-paddedIndex); ++i)
 	{
 		printf(" 0x%2x \n", UUE_Encoded_String[i]);
-
 	}
+	*/
 }
 
 void fileSizer()
@@ -179,6 +167,9 @@ void clearSpecChar()
 }
 
 int readByte(){
+	//Holds combined nibbles.
+	unsigned char hexValue;
+	
 	//Get first nibble.
 	charToPut = fgetc (fileIn);
 	clearSpecChar();
@@ -198,41 +189,45 @@ int readByte(){
 
 
 //Convert file to one long char array.
-int hexFileToCharArray()
+struct hexFile hexFileToCharArray()
 {
 	//To count through all characters in the file.
 	int i = 0;
 	int hexDataIndex = 0;
+	int charsThisLine;
+	//Holds line count.
+	int hexFileLineCount = 0;
 	
+	struct hexFile hexFile;
+
 	//Loop through each character until EOF.
 	while(totalCharsRead  < fileSize){
 		
 		//BYTE COUNT
-		fhexByteCount[i] = readByte();
+		hexFile.fhexByteCount[i] = readByte();
 		
 		//ADDRESS1 //Will create an 8 bit shift. --Bdk6's
-		fhexAddress1[i] = readByte();
+		hexFile.fhexAddress1[i] = readByte();
 		
 		//ADDRESS2
-		fhexAddress2[i] = readByte();
+		hexFile.fhexAddress2[i] = readByte();
 		
 		//addressCombine();
 		
 		//RECORD TYPE
-		fhexRecordType[i] = readByte();	
+		hexFile.fhexRecordType[i] = readByte();	
 		
 		//Throws the byte count (data bytes in this line) into an integer.
-		charsThisLine = fhexByteCount[i];
+		charsThisLine = hexFile.fhexByteCount[i];
 
-
-		
 		//////// DATA ///////////////////
 		while (hexDataIndex != charsThisLine && totalCharsRead  < fileSize && charsThisLine != 0x00)
 		{
 			//Store the completed hex value in the char array.
-			fileData_Hex_String[dataSize] = readByte();
+			hexFile.fileData_Hex_String[hexFile.fileData_Hex_String_Size] = readByte();
+			
 			//Index for data.
-			dataSize++;
+			hexFile.fileData_Hex_String_Size++;
 			//Index for loop.
 			hexDataIndex++;
 		}
@@ -241,14 +236,15 @@ int hexFileToCharArray()
 		
 		//////// CHECK SUM //////////////
 		if (charToPut != 0xFF){
-			fhexCheckSum[i] = readByte();
+			hexFile.fhexCheckSum[i] = readByte();
 		}
 		i++;
 		
 		
 	}
 	//Load the size of the data array.
-	hexFileLineCount = (i);
+	hexFileLineCount = i;
+	return hexFile;
 }
 
 int main(int argc, char *argv[])
@@ -257,6 +253,7 @@ int main(int argc, char *argv[])
     unsigned char DTR_Switch;
 	unsigned char CTS_Switch;
 
+	struct hexFile hexFile;
 	//Used by FTD2XX
     DWORD bytes;
 
@@ -286,47 +283,25 @@ int main(int argc, char *argv[])
 	fileSizer();
 	
 	//Convert file to one long char array.
-	hexFileToCharArray();
-	//unsigned char b[] = {0x54, 0x68, 0x65, 0x20, 0x77, 0x69, 0x74, 0x63, 0x68, 0x20, 0x4c, 0x69, 0x6c, 0x69, 0x74, 0x68, 0x20, 0x6b, 0x6e, 0x6f, 0x77, 0x73, 0x20, 0x6d, 0x79, 0x20, 0x73, 0x6f, 0x75, 0x6c, 0x2e};
-	unsigned char b[] = {0x54, 0x68, 0x65, 0x20, 0x77, 0x69, 0x74, 0x63, 0x68, 0x20, 0x4c, 0x69, 0x6c, 0x69, 0x74, 0x68, 0x20, 0x6b, 0x6e, 0x6f, 0x77, 0x73, 0x20, 0x6d, 0x79, 0x20, 0x73, 0x6f, 0x75, 0x6c, 0x2e};
-	int strLength = 0;
-	strLength = strlen(b);
-	//printf("%i\n", strlen(b));
-	//printf("\n\nHex output file\n\n");
-	
+	hexFile = hexFileToCharArray();
+
 	//Used for indexing data bytes in for-loop.
 	int dataPerLineIndex = 0;
-	
-	//Loops through each line, until the line count and index are equal.
-	for(int lineIndex = 0; lineIndex != hexFileLineCount; ++lineIndex){
-		
-		//Converts this line byte count into an integer.
-		charsThisLine = fhexByteCount[lineIndex];
-		
-		//Loops through printing data bytes until byte count 
-		//for this line and index are equal.
-		for(int charsOnThisLineIndex = 0; charsOnThisLineIndex != charsThisLine; charsOnThisLineIndex++)
-		{
-			// Print the bytes.
-			//printf("%2x ", fileData_Hex_String[dataPerLineIndex]);
-			//Increases overall data index.
-			dataPerLineIndex++;
-		}
-		//Print data bytes on this line.
-		//printf(" #%i\n", (charsThisLine));
 
+	UUencode(hexFile.fileData_Hex_String, hexFile.fileData_Hex_String_Size);
+
+	for (int totalUUEData_Index = 0; totalUUEData_Index < hexFile.fileData_Hex_String_Size; totalUUEData_Index)
+	{
+		for (int i = 0; i < 60; i++)
+		{
+			printf(" 0x%2x", hexFile.fileData_Hex_String[totalUUEData_Index]);
+			totalUUEData_Index++;
+		}
+		printf("\nEND PAGE\n\n");
 	}
 
-	//encode();
-	//encode2(b, dataSize);
-	encode2(b, strLength);
-
-	//Prints fileSize and totalCharsRead for user.
-	//printf("\nFile Size : %i\n", fileSize);
-	//printf("Chars Read: %i\n", ((totalCharsRead)));
-			
 	//Prints out each byte, one at a time.
-	for (int i = 0; i < dataSize; i++){
+	for (int i = 0; i < hexFile.fileData_Hex_String_Size; i++){
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
 		//FT_Write(handle, &fileData_Hex_String[i], (DWORD)sizeof(fileData_Hex_String[i]), &bytes);
 		//printf(" #%i", (i));
@@ -342,4 +317,4 @@ int main(int argc, char *argv[])
 	//Close files.
 	fclose ( fileIn );
 
-}
+} // END PROGRAM

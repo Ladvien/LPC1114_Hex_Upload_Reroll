@@ -30,8 +30,11 @@ FT_HANDLE handle;
 
 //File to be loaded.	
 FILE *fileIn;
+FILE *hexDataFile;
+FILE *UUEDataFile;
+
 int fileSize = 0;
-char * fileCharPoint;
+
 
 //Reading characters from a file.
 unsigned char charToPut;
@@ -40,11 +43,11 @@ unsigned char charToPut;
 int totalCharsRead = 0;
 
 struct hexFile {
-
 	//To hold file hex values.
 	unsigned char fileData_Hex_String[MAX_SIZE];
 	int fileData_Hex_String_Size;
 	unsigned char fhexByteCount[MAX_SIZE];
+	int hexFileLineCount;
 	unsigned char fhexAddress1[MAX_SIZE];
 	unsigned char fhexAddress2[MAX_SIZE];
 	unsigned char fhexRecordType[MAX_SIZE];
@@ -52,9 +55,17 @@ struct hexFile {
 
 };
 
+struct UUE_Data{
+	unsigned char UUE_Encoded_String[MAX_SIZE];
+	unsigned char b[3];
+	unsigned char d[4];
 
+	int paddedIndex;
+	int UUE_Encoded_String_Index;
+};
 
 ///////////////////// PROGRAM ////////////////////////////
+////////////////////// START /////////////////////////////
 
 //Open file for reading, function.
 static FILE *open_file ( char *file, char *mode )
@@ -70,7 +81,7 @@ static FILE *open_file ( char *file, char *mode )
 }
 
 
-void UUencode(unsigned char fileData_Hex_String[], int hexDataCharCount)
+struct UUE_Data UUencode()
 {
 	// ASCII->HEX->UUE Test Strings
 	// ASCII: The witch Lilith knows my soul.
@@ -79,42 +90,41 @@ void UUencode(unsigned char fileData_Hex_String[], int hexDataCharCount)
 	// UUE-HEX:{35 26 41 45 28 27 3d 49 3d 26 2d 48 28 24 51 49 3b 26 45 54 3a 22 21 4b 3b 46 5d 57 3c 52 21 4d 3e 32 21 53 3b 57 35 4c 2b 40}
 	//unsigned char testUUE_HEX[] = {0x54, 0x68, 0x65, 0x20, 0x63, 0x61, 0x72, 0x00};
 
-	unsigned char UUE_Encoded_String[MAX_SIZE];
-	unsigned char b[3];
-	unsigned char d[4];
+	// Stores hexFile data.
+	struct hexFile hexFile;
 
-	int paddedIndex = 0;
-	int UUE_Encoded_String_Index = 0;
+	struct UUE_Data UUE_Data;
+	//unsigned char fileData_Hex_String[], int hexDataCharCount
 
-	for(int hexDataIndex = 0;  hexDataIndex < hexDataCharCount; hexDataIndex)
+	for(int hexDataIndex = 0;  hexDataIndex < hexFile.fileData_Hex_String_Size; hexDataIndex)
 	{
 		// Load chars or nulls
 		for (int i = 0; i < 3; i++)
 		{
 
-			if (hexDataIndex < hexDataCharCount)
+			if (hexDataIndex < hexFile.fileData_Hex_String_Size)
 			{
-				b[i] = fileData_Hex_String[hexDataIndex];	
+				UUE_Data.b[i] = hexFile.fileData_Hex_String[hexDataIndex];	
 			}
 			else
 			{
-				b[i] = 0;
-				paddedIndex++;
+				UUE_Data.b[i] = 0;
+				UUE_Data.paddedIndex++;
 			}
 			hexDataIndex++;
 		}
 		
 		// UUEncode
-		d[0] = (((b[0] >> 2) & 0x3f) + ' ');
-		d[1] = ((((b[0] << 4) | ((b[1] >> 4) & 0x0f)) & 0x3f) + ' ');
-		d[2] = ((((b[1] << 2) | ((b[2] >> 6) & 0x03)) & 0x3f) + ' ');
-		d[3] = ((b[2] & 0x3f) + ' ');
+		UUE_Data.d[0] = (((UUE_Data.b[0] >> 2) & 0x3f) + ' ');
+		UUE_Data.d[1] = ((((UUE_Data.b[0] << 4) | ((UUE_Data.b[1] >> 4) & 0x0f)) & 0x3f) + ' ');
+		UUE_Data.d[2] = ((((UUE_Data.b[1] << 2) | ((UUE_Data.b[2] >> 6) & 0x03)) & 0x3f) + ' ');
+		UUE_Data.d[3] = ((UUE_Data.b[2] & 0x3f) + ' ');
 		
 		// Put the UUEncoded chars into their own string.
 		for (int i = 0; i < 4; i++)
 		{
-			UUE_Encoded_String[UUE_Encoded_String_Index] = d[i];
-			UUE_Encoded_String_Index++;
+			UUE_Data.UUE_Encoded_String[UUE_Data.UUE_Encoded_String_Index] = UUE_Data.d[i];
+			UUE_Data.UUE_Encoded_String_Index++;
 		}
 	}
 	
@@ -126,6 +136,8 @@ void UUencode(unsigned char fileData_Hex_String[], int hexDataCharCount)
 		printf(" 0x%2x \n", UUE_Encoded_String[i]);
 	}
 	*/
+	UUE_Data.UUE_Encoded_String_Index = UUE_Data.UUE_Encoded_String_Index - UUE_Data.paddedIndex;
+	return UUE_Data;
 }
 
 void fileSizer()
@@ -151,11 +163,31 @@ static unsigned char Ascii2Hex(unsigned char c)
     }
     if (c >= 'a' && c <= 'f')
     {
-        return (unsigned char)(c - 'a' + 10);
+        return (unsigned char)(c - 'A' + 10);
     }
 	//printf("\n !!! Bad Character: 0x%2x in file at totalCharsRead=%d !!!\n\n", c, totalCharsRead);
     return 0;  // this "return" will never be reached, but some compilers give a warning if it is not present
 } 
+
+int Hex2Int(unsigned char c)
+{
+	int first = c / 16 - 3;
+    int second = c % 16;
+    int result = first*10 + second;
+    //if(result > 9) result--;
+    return result;
+}
+
+int Hex2Ascii(unsigned char hexValue)
+{
+	unsigned char c = hexValue >>= 4;
+	hexValue <<= 4;
+	unsigned char d = hexValue >>= 4;
+
+    int high = Hex2Int(c) * 16;
+	int low = Hex2Int(d);
+	return high+low;
+}
 
 void clearSpecChar()
 {
@@ -196,7 +228,7 @@ struct hexFile hexFileToCharArray()
 	int hexDataIndex = 0;
 	int charsThisLine;
 	//Holds line count.
-	int hexFileLineCount = 0;
+	
 	
 	struct hexFile hexFile;
 
@@ -238,22 +270,72 @@ struct hexFile hexFileToCharArray()
 		if (charToPut != 0xFF){
 			hexFile.fhexCheckSum[i] = readByte();
 		}
+
+		hexFile.hexFileLineCount++;
 		i++;
 		
 		
 	}
-	//Load the size of the data array.
-	hexFileLineCount = i;
+	
+	
 	return hexFile;
 }
 
+void writeHexDataTofile(unsigned char fileData_Hex_String[], int hexDataCharCount, unsigned char byteCount[], int hexFileLineCount)
+{
+	
+	hexDataFile = open_file ("hexFile.hex", "w" );
+	if (hexDataFile == NULL) {
+    	printf("I couldn't open hexFile.hex for writing.\n");
+        exit(0);
+    }
+	
+	for (int totalDataIndex = 0; totalDataIndex < hexDataCharCount; totalDataIndex)
+	{
+		for (int lineIndex = 0; lineIndex < hexFileLineCount; ++lineIndex)
+		{
+			int bytesThisLine = (byteCount[lineIndex]);
+			for (int i = 0; i < bytesThisLine && totalDataIndex < hexDataCharCount; ++i)  //need to change 16 to byteCount.
+			{
+				if ((fileData_Hex_String[totalDataIndex]) != 0x00)
+				{
+					fprintf(hexDataFile, "%2x", fileData_Hex_String[totalDataIndex]);
+				}
+				else
+				{
+					fprintf(hexDataFile, "00", fileData_Hex_String[totalDataIndex]);	
+				}
+				totalDataIndex++;
+			}
+		fprintf(hexDataFile, "\n");
+		}
+
+	}
+}
+
+void writeUUEDataTofile(unsigned char fileData_Hex_String[], int hexDataCharCount)
+{
+	UUEDataFile = open_file ("uueFile.uue", "w" );
+	if (UUEDataFile == NULL) {
+    	printf("I couldn't open uueFile.uue for writing.\n");
+    	exit(0);
+    }
+}
+
+
+
 int main(int argc, char *argv[])
 {
+	// Stores hexFile data.
+	struct hexFile hexFile;
+
+	// Stores UUE data.
+	struct UUE_Data UUE_Data;
+
 	//For setting state of DTR/CTS.
     unsigned char DTR_Switch;
 	unsigned char CTS_Switch;
 
-	struct hexFile hexFile;
 	//Used by FTD2XX
     DWORD bytes;
 
@@ -263,21 +345,19 @@ int main(int argc, char *argv[])
 		exit ( EXIT_FAILURE );
 	}
 
-	
- 
 	//Open file using command-line info; for reading.
-	fileIn = open_file ( argv[1], "rb" );
-
+	fileIn = open_file (argv[1], "rb" );
+	
 	// Initialize, open device, set bitbang mode w/5 outputs
-    //if(FT_Open(0, &handle) != FT_OK) {
-    //    puts("Can't open device");
-    //    return 1;
-    //}
+    if(FT_Open(0, &handle) != FT_OK) {
+        puts("Can't open device");
+        return 1;
+    }
 
 	//Set up pins we will use.
-	//FT_SetBitMode(handle, PIN_DTR | PIN_CTS, 1);
+	FT_SetBitMode(handle, PIN_DTR | PIN_CTS, 1);
 	//Setup serial port, even though we are banging.
-    //FT_SetBaudRate(handle, 9600);  //* Actually 9600 * 16
+    FT_SetBaudRate(handle, 9600);  //* Actually 9600 * 16
 
 	//Sizes file to be used in data handling.
 	fileSizer();
@@ -285,11 +365,17 @@ int main(int argc, char *argv[])
 	//Convert file to one long char array.
 	hexFile = hexFileToCharArray();
 
+	//int dataLinesInFile = sizeof(hexFile.hexFileLineCount);
+	printf("%i\n", hexFile.hexFileLineCount);
+
+	// Write hex string back to a file.  Used for debugging.
+	writeHexDataTofile(hexFile.fileData_Hex_String, hexFile.fileData_Hex_String_Size, hexFile.fhexByteCount, hexFile.hexFileLineCount);
+	
+	// Convert hex data to UUE.
+	UUE_Data = UUencode();
+
 	//Used for indexing data bytes in for-loop.
 	int dataPerLineIndex = 0;
-
-	UUencode(hexFile.fileData_Hex_String, hexFile.fileData_Hex_String_Size);
-
 	for (int totalUUEData_Index = 0; totalUUEData_Index < hexFile.fileData_Hex_String_Size; totalUUEData_Index)
 	{
 		for (int i = 0; i < 60; i++)
@@ -300,21 +386,25 @@ int main(int argc, char *argv[])
 		printf("\nEND PAGE\n\n");
 	}
 
+
+
 	//Prints out each byte, one at a time.
-	for (int i = 0; i < hexFile.fileData_Hex_String_Size; i++){
+	for (int i = 0; i < UUE_Data.UUE_Encoded_String_Index; i++){
+		unsigned char * bufPtr = UUE_Data.UUE_Encoded_String[i];
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
-		//FT_Write(handle, &fileData_Hex_String[i], (DWORD)sizeof(fileData_Hex_String[i]), &bytes);
-		//printf(" #%i", (i));
-		Sleep(1);
+		FT_Write(handle, UUE_Data.UUE_Encoded_String[i], (DWORD)sizeof(UUE_Data.UUE_Encoded_String[i]), &bytes);
+		printf(" %2x", UUE_Data.UUE_Encoded_String[i]);
+		Sleep(5);
 	}	
 
 	//Let's close the serial port.
-	//if(FT_Close(handle) != FT_OK) {
-    //    puts("Can't close device");
-    //    return 1;
-    //}
+	if(FT_Close(handle) != FT_OK) {
+        puts("Can't close device");
+        return 1;
+    }
 
 	//Close files.
 	fclose ( fileIn );
-
+	fclose ( UUEDataFile );
+	fclose ( hexDataFile );
 } // END PROGRAM

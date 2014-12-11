@@ -355,7 +355,7 @@ int main(int argc, char *argv[])
     }
 
 	//Set up pins we will use.
-	FT_SetBitMode(handle, PIN_DTR | PIN_CTS, 1);
+	//FT_SetBitMode(handle, PIN_DTR | PIN_CTS, 1);
 	//Setup serial port, even though we are banging.
     FT_SetBaudRate(handle, 9600);  //* Actually 9600 * 16
 
@@ -387,12 +387,10 @@ int main(int argc, char *argv[])
 	}
 
 
-
 	//Prints out each byte, one at a time.
 	for (int i = 0; i < UUE_Data.UUE_Encoded_String_Index; i++){
-		unsigned char * bufPtr = UUE_Data.UUE_Encoded_String[i];
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
-		FT_Write(handle, UUE_Data.UUE_Encoded_String[i], (DWORD)sizeof(UUE_Data.UUE_Encoded_String[i]), &bytes);
+		FT_Write(handle, &UUE_Data.UUE_Encoded_String[i], (DWORD)sizeof(UUE_Data.UUE_Encoded_String[i]), &bytes);
 		printf(" %2x", UUE_Data.UUE_Encoded_String[i]);
 		Sleep(5);
 	}	

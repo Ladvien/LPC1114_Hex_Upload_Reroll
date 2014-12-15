@@ -56,6 +56,8 @@ void writeHexDataTofile(unsigned char fileData_Hex_String[], int hexDataCharCoun
 static FILE *open_file ( char *file, char *mode );
 void fileSizer();
 unsigned char * rx(int timeout, unsigned char *rxString);
+char txString(char string[], int txString_size);
+
 
 // Data Handling
 struct hexFile hexFileToCharArray();
@@ -76,6 +78,32 @@ struct UUE_Data UUencode();
 //#define PIN_DSR 0x20
 //#define PIN_DCD 0x40
 //#define PIN_RI  0x80
+
+	// HM-11-A sends "AT+PIO30"
+	// The HM-11-B PIO3 will go low, which sets the LPC1114 ISP MODE to LOW.  
+	// HM-11-A sends "AT+PIO20"
+	// Then, the HM-11-B PIO2 goes LOW for ~5uS.  This will reset the LPC.
+	// As the LPC comes back up it checks the ISP MODE pin and sees it LOW.
+	// HM-11-A sends "AT+PIO31" waits ~100mS then sends "AT+PIO21"
+	// The HM-11-B PIO3 and PIO2 will go HIGH.
+	// The LPC enters ISP mode.
+	// The HM-11 PIO2 & PIO3 go HIGH.
+	// The program is uploaded to the LPC.
+	// HM-11-A sends "AT+PIO20"
+	// HM-11-B PIO2 goes LOW, resetting the LPC.
+	// HM-11-A sends "AT+PIO21"
+	// HM-11-B PIO2 goes HIGH and the LPC runs the uploaded program.
+
+// HM-10 OR HM-11 COMMANDS
+#define HM_RESET "AT+RESET"
+#define HM_ISP_LOW "AT+PIO30"
+#define HM_ISP_HIGH "AT+PIO31"
+#define HM_LPC_RESET_LOW "AT+PIO20"
+#define HM_LPC_RESET_HIGH "AT+PIO21"
+
+// LPC Commands
+#define LPC_CHECK "?"
+
 
 #define MAX_SIZE 32768
 
@@ -196,7 +224,7 @@ int main(int argc, char *argv[])
 
 	*/
 
-	unsigned char lineReturn = '\r';
+	
 	//Prints out each byte, one at a time.
 
 	/*
@@ -208,29 +236,30 @@ int main(int argc, char *argv[])
 	}	
 	*/
 
-	// HM-11-A sends "AT+PIO30"
-	// The HM-11-B PIO3 will go low, which sets the LPC1114 ISP MODE to LOW.  
-	// HM-11-A sends "AT+PIO20"
-	// Then, the HM-11-B PIO2 goes LOW for ~5uS.  This will reset the LPC.
-	// As the LPC comes back up it checks the ISP MODE pin and sees it LOW.
-	// HM-11-A sends "AT+PIO31" waits ~100mS then sends "AT+PIO21"
-	// The HM-11-B PIO3 and PIO2 will go HIGH.
-	// The LPC enters ISP mode.
-	// The HM-11 PIO2 & PIO3 go HIGH.
-	// The program is uploaded to the LPC.
-	// HM-11-A sends "AT+PIO20"
-	// HM-11-B PIO2 goes LOW, resetting the LPC.
-	// HM-11-A sends "AT+PIO21"
-	// HM-11-B PIO2 goes HIGH and the LPC runs the uploaded program.
+
 		
 	//char lower_Isp[] = "AT+RESET";
 	//FT_status = FT_Write(handle, &lower_Isp, ((DWORD)sizeof(lower_Isp)-1), &bytes);
 	//printf("%i\n", bytes);
 
 	unsigned char rxString[256];
+	
+	txString(HM_ISP_LOW, sizeof(HM_ISP_LOW));
+	Sleep(800);
+	rx(10, rxString);
+	txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW));
+	Sleep(800);
+	txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH));
+	Sleep(800);
+	txString(HM_ISP_HIGH, sizeof(HM_ISP_HIGH));
+	Sleep(800);
+	txString(LPC_CHECK, sizeof(LPC_CHECK));
+	Sleep(800);
+
+	
 	rx(5000, rxString);
 
-	printf("%s", RxBuffer);
+	printf("%s", rxString);
 
 	//Let's close the serial port.
 	if(FT_Close(handle) != FT_OK) {
@@ -278,25 +307,34 @@ unsigned char * rx(int timeout, unsigned char *rxString)
 	//FT_SetTimeouts(handle, timeout, 0);
 	FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
 
-	//printf("%i\n", RxBytes);
-	while (RxBytes > 0)
+	printf("%i   %i\n", bytes, BytesReceived);
+	printf("Here 1\n");
+	while (RxBytes > 1)
 	{
-		if (RxBytes > 0) {
+		printf("%i   %i\n", bytes, BytesReceived);
+		printf("Here 2\n");
+		if (RxBytes > 1) {
+			printf("Here 3\n");
 			FT_status = FT_Read(handle, &RxBuffer, RxBytes, &BytesReceived);
 			if (FT_status == FT_OK) {
 				if (rxString == 0)
 				{
+					printf("Here 4\n");
 					strcpy(rxString, RxBuffer);
 				}
 				else
 				{
+					printf("Here 5\n");
 					strcat(rxString, RxBuffer);	
 				}
 				for (int i = 0; i < strlen(rxString); ++i)
 				{
+					printf("Here 6\n");
 					if (rxString[i] == '\n')
 					{
+						printf("Here 7\n");
 						return rxString;
+						break;
 					}
 				}
 			}
@@ -315,6 +353,17 @@ unsigned char * rx(int timeout, unsigned char *rxString)
 
 	//Sleep(10);
 	return rxString;
+}
+
+char txString(char string[], int txString_size)
+{
+	unsigned char FTWrite_Check;
+	for (int i = 0; i < (txString_size-1); i++){
+		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
+		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), &bytes);
+		//FTWrite_Check = FT_Write(handle, &lineReturn, 1, &bytes);
+	}	
+	printf("TX: %s\n", string);
 }
 
 ///////////// Debugging //////////////////////////////////////////////////////////////////////

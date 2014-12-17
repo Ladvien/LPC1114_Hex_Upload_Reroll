@@ -49,7 +49,7 @@ The smallest amount of data we may write to Flash is 256 bytes (one page).
 //////////////////// Forward Declaration ////////////////////////////////////////////////////////////
 
 // Output files, for debugging purposes.
-void writeUUEDataTofile(unsigned char fileData_Hex_String[], int hexDataCharCount);
+void writeUUEDataTofile(unsigned char UUE_Encoded_String[], int hexDataCharCount);
 void writeHexDataTofile(unsigned char fileData_Hex_String[], int hexDataCharCount, unsigned char byteCount[], int hexFileLineCount);
 
 // FTDI
@@ -209,38 +209,7 @@ int main(int argc, char *argv[])
 	// Convert hex data to UUE.
 	UUE_Data = UUencode();
 
-	/*
-	//Used for indexing data bytes in for-loop.
-	int dataPerLineIndex = 0;
-	for (int totalUUEData_Index = 0; totalUUEData_Index < hexFile.fileData_Hex_String_Size; totalUUEData_Index)
-	{
-		for (int i = 0; i < 60; i++)
-		{
-			printf(" 0x%2x", hexFile.fileData_Hex_String[totalUUEData_Index]);
-			totalUUEData_Index++;
-		}
-		printf("\nEND PAGE\n\n");
-	}
-
-	*/
-
-	
-	//Prints out each byte, one at a time.
-
-	/*
-	for (int i = 0; i < UUE_Data.UUE_Encoded_String_Index; i++){
-		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
-		FTWrite_Check = FT_Write(handle, &UUE_Data.UUE_Encoded_String[i], (DWORD)sizeof(UUE_Data.UUE_Encoded_String[i]), &bytes);
-		//FTWrite_Check = FT_Write(handle, &lineReturn, 1, &bytes);
-		Sleep(5);
-	}	
-	*/
-
-
-		
-	//char lower_Isp[] = "AT+RESET";
-	//FT_status = FT_Write(handle, &lower_Isp, ((DWORD)sizeof(lower_Isp)-1), &bytes);
-	//printf("%i\n", bytes);
+	writeUUEDataTofile(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index);
 
 	unsigned char rxString[256];
 	
@@ -312,72 +281,17 @@ void fileSizer()
 	}
 	rewind(fileIn);
 }
-/*
+
 unsigned char * rx(int timeout, unsigned char *rxString)
 {
-	Sleep(800);
-
+	Sleep(40);
 	//FT_SetTimeouts(handle, timeout, 0);
-	FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
-
-	printf("%i   %i\n", bytes, BytesReceived);
-	printf("Here 1\n");
-	while (RxBytes > 1)
-	{
-		printf("%i   %i\n", bytes, BytesReceived);
-		printf("Here 2\n");
-		if (RxBytes > 1) {
-			printf("Here 3\n");
-			FT_status = FT_Read(handle, &RxBuffer, RxBytes, &BytesReceived);
-			if (FT_status == FT_OK) {
-				for (int i = 0; i < strlen(rxString); ++i)
-				{
-					printf("Here 6\n");
-					if (rxString[i] == '\n')
-					{
-						printf("Here 7\n");
-						return rxString;
-						break;
-					}
-				}
-				if (rxString == 0)
-				{
-					printf("Here 4\n");
-					strcpy(rxString, RxBuffer);
-				}
-				else
-				{
-					printf("Here 5\n");
-					strcat(rxString, RxBuffer);	
-				}
-
-			}
-			else {
-				printf("RX buffer empty.\n");
-				break;
-			}
-		}
-		else {
-			printf("RX: %s\n", rxString);
-			break;
-
-		}
-		Sleep(200);
-	}
-
-	//Sleep(10);
-	return rxString;
-}
-*/
-unsigned char * rx(int timeout, unsigned char *rxString)
-{
-	Sleep(200);
 	FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
 	//printf("RX: %s  RxBytes: %i         BytesReceived:   %i\n",RxBuffer, RxBytes, BytesReceived);
 	if (RxBytes > 0) {
 		FT_status = FT_Read(handle,RxBuffer,RxBytes,&BytesReceived);
 		if (FT_status == FT_OK) {
-			printf("RX: %s  RxBytes: %i         BytesReceived:   %i\n",RxBuffer, RxBytes, BytesReceived);
+			printf("RX: %s                       RxBytes: %i BytesReceived:   %i\n",RxBuffer, RxBytes, BytesReceived);
 		}
 		else {
 			// FT_Read Failed
@@ -399,12 +313,38 @@ char txString(char string[], int txString_size)
 ///////////// Debugging //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-void writeUUEDataTofile(unsigned char fileData_Hex_String[], int hexDataCharCount)
+void writeUUEDataTofile(unsigned char UUE_Encoded_String[], int UUE_Encoded_String_Index)
 {
+	unsigned char UnixFilePermissions[] = "0777";
+
 	UUEDataFile = open_file ("uueFile.uue", "w" );
+	// Create UUE header 
+	fprintf(UUEDataFile, "begin %s %s\n", UnixFilePermissions, "uueFile.uue");
 	if (UUEDataFile == NULL) {
 		printf("I couldn't open uueFile.uue for writing.\n");
 		exit(0);
+	}
+	else
+	{
+		for (int characterIndex = 0; characterIndex < UUE_Encoded_String_Index; characterIndex)
+		{
+			for (int lineIndex = 0; lineIndex < 45; ++lineIndex)
+			{
+				if (UUE_Encoded_String[characterIndex] == ' ')
+				{
+					fprintf(UUEDataFile, "'");
+					characterIndex++;
+				}
+				else
+				{
+					fprintf(UUEDataFile, "%c", UUE_Encoded_String[characterIndex]);	
+					characterIndex++;
+				}
+			}
+			fprintf(UUEDataFile, "\n");
+			//printf("\n\n\n%i", UUE_Encoded_String_Index);
+		}
+			
 	}
 }
 

@@ -58,6 +58,8 @@ void fileSizer();
 unsigned char * rx(int timeout, unsigned char *rxString);
 char txString(char string[], int txString_size);
 
+// LPC handling
+unsigned char set_ISP_mode();
 
 // Data Handling
 struct hexFile hexFileToCharArray();
@@ -103,6 +105,7 @@ struct UUE_Data UUencode();
 
 // LPC Commands
 #define LPC_CHECK "?"
+#define Synchronized "Synchronized\n"
 
 
 #define MAX_SIZE 32768
@@ -171,6 +174,8 @@ int main(int argc, char *argv[])
 	unsigned char DTR_Switch;
 	unsigned char CTS_Switch;
 
+	unsigned char rxString[256];
+
 	//If the user fails to give us two arguments yell at him.	
 	if ( argc != 2 ) {
 		fprintf ( stderr, "Usage: %s <readfile1>\n", argv[0] );
@@ -220,37 +225,21 @@ int main(int argc, char *argv[])
 
 	writeUUEDataTofile(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index);
 
-	unsigned char rxString[256];
+	// Set LPC into ISP mode.
+	set_ISP_mode();
+
+	//Sleep(500);
+	//txString(HM_RESET, sizeof(HM_RESET));
 	
-	txString(HM_ISP_LOW, sizeof(HM_ISP_LOW));
+	// Set crystal
+	txString("12000\n", sizeof("12000\n"));
 	Sleep(500);
 	rx(5000, rxString);
-	printf("%s \n", rxString);
 
-	txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW));
+	// Send Unlock Code
+	txString("U 23130", sizeof("U 23130"));
 	Sleep(500);
 	rx(5000, rxString);
-	printf("%s \n", rxString);
-
-	txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH));
-	Sleep(500);
-	rx(5000, rxString);
-	printf("%s \n", rxString);
-
-	txString(HM_ISP_HIGH, sizeof(HM_ISP_HIGH));
-	Sleep(500);
-	rx(5000, rxString);
-	printf("%s \n", rxString);
-
-	txString(LPC_CHECK, sizeof(LPC_CHECK));
-	Sleep(500);
-	rx(5000, rxString);
-	printf("%s \n", rxString);
-
-	Sleep(500);
-	txString(HM_RESET, sizeof(HM_RESET));
-
-
 
 	//Let's close the serial port.
 	if(FT_Close(handle) != FT_OK) {
@@ -265,6 +254,43 @@ int main(int argc, char *argv[])
 } // END PROGRAM
 
 
+///////////// LPC Handling ///////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+unsigned char set_ISP_mode()
+{
+	unsigned char rxString[256];
+
+	txString(HM_ISP_LOW, sizeof(HM_ISP_LOW));
+	Sleep(500);
+	rx(5000, rxString);
+
+	txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW));
+	Sleep(500);
+	rx(5000, rxString);
+
+	txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH));
+	Sleep(500);
+	rx(5000, rxString);
+
+	txString(HM_ISP_HIGH, sizeof(HM_ISP_HIGH));
+	Sleep(500);
+	rx(5000, rxString);
+
+	// Synchronized check.
+	txString(LPC_CHECK, sizeof(LPC_CHECK));
+	Sleep(500);
+	rx(5000, rxString);
+
+	txString(Synchronized, sizeof(Synchronized));
+	Sleep(500);
+	rx(5000, rxString);
+
+
+	// CHECK IF IN RESET MODE
+
+	//return 1;
+}
 
 ///////////// FTDI  //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -293,18 +319,48 @@ void fileSizer()
 
 unsigned char * rx(int timeout, unsigned char *rxString)
 {
-	Sleep(40);
+	// Less than ~40ms and characters get garbled?
+	Sleep(80);
 	//FT_SetTimeouts(handle, timeout, 0);
-	FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
+	FT_GetQueueStatus(handle,&RxBytes);
+	//FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
 	//printf("RX: %s  RxBytes: %i         BytesReceived:   %i\n",RxBuffer, RxBytes, BytesReceived);
 	if (RxBytes > 0) {
 		FT_status = FT_Read(handle,RxBuffer,RxBytes,&BytesReceived);
 		if (FT_status == FT_OK) {
-			printf("RX: %s                       RxBytes: %i BytesReceived:   %i\n",RxBuffer, RxBytes, BytesReceived);
+			
+			// GET DATA
+			
+			//FT_status = FT_Purge(handle, FT_PURGE_RX | FT_PURGE_TX); // Purge both Rx and Tx buffers
+
+// Removes CR and LF for debugging.
+/*
+			for (int i = 0; i != sizeof(RxBuffer); ++i)
+			{
+				if (RxBuffer[i] == '\r')
+				{
+					RxBuffer[i] = 'R';
+				}
+				if (RxBuffer[i] == '\n')
+				{
+					RxBuffer[i] = 'N';
+				}
+			}
+*/
+
+			// Print data.
+			//printf("RX: %s ------------ RxBytes: %i BytesReceived: %i\n",RxBuffer, RxBytes, BytesReceived);
+			printf("RX: %s\n", RxBuffer);
+			
+			for (int i = 0; i != sizeof(RxBuffer); ++i)
+			{
+				RxBuffer[i] = 0;
+			}
 		}
 		else {
-			// FT_Read Failed
+			printf("RX FAILED \n");
 		}
+		printf("\n");
 	}
 }
 
@@ -314,7 +370,6 @@ char txString(char string[], int txString_size)
 	for (int i = 0; i < (txString_size-1); i++){
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
 		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), &bytes);
-		//FTWrite_Check = FT_Write(handle, &lineReturn, 1, &bytes);
 	}	
 	printf("TX: %s\n", string);
 }

@@ -237,7 +237,36 @@ int main(int argc, char *argv[])
 	rx(5000, rxString);
 
 	// Send Unlock Code
-	txString("U 23130", sizeof("U 23130"));
+	txString("U 23130\n", sizeof("U 23130\n"));
+	Sleep(500);
+	rx(5000, rxString);
+
+	// Read Part ID
+	txString("J\n", sizeof("J\n"));
+	Sleep(500);
+	printf("Read Part ID:\n");
+	rx(5000, rxString);
+
+	// Boot Version
+	txString("K\n", sizeof("K\n"));
+	Sleep(500);
+	printf("Read Boot Version:\n");
+	rx(5000, rxString);
+
+	// Read Part ID
+	txString("N\n", sizeof("N\n"));
+	Sleep(500);
+	printf("Read UID:\n");
+	rx(5000, rxString);
+
+	// Read memory
+	txString("R 0 168\n", sizeof("R 0 168\n"));
+	Sleep(500);
+	rx(5000, rxString);
+
+	// Write memory
+	txString("W 268436224 4\n", sizeof("W 268436224 4\n"));
+	txString("ASDA", sizeof("ASDA"));
 	Sleep(500);
 	rx(5000, rxString);
 
@@ -285,7 +314,6 @@ unsigned char set_ISP_mode()
 	txString(Synchronized, sizeof(Synchronized));
 	Sleep(500);
 	rx(5000, rxString);
-
 
 	// CHECK IF IN RESET MODE
 

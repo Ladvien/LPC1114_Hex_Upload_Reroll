@@ -241,34 +241,46 @@ int main(int argc, char *argv[])
 	Sleep(500);
 	rx(5000, rxString);
 
-	// Read Part ID
-	txString("J\n", sizeof("J\n"));
-	Sleep(500);
-	printf("Read Part ID:\n");
-	rx(5000, rxString);
 
-	// Boot Version
-	txString("K\n", sizeof("K\n"));
-	Sleep(500);
-	printf("Read Boot Version:\n");
-	rx(5000, rxString);
-
-	// Read Part ID
-	txString("N\n", sizeof("N\n"));
-	Sleep(500);
-	printf("Read UID:\n");
-	rx(5000, rxString);
 
 	// Read memory
-	txString("R 0 168\n", sizeof("R 0 168\n"));
+	txString("R 268436224 4\n", sizeof("R 268436224 4\n"));
 	Sleep(500);
 	rx(5000, rxString);
+	txString("OK\n", sizeof("OK\n"));
+	Sleep(500);
+	rx(5000, rxString);
+
 
 	// Write memory
 	txString("W 268436224 4\n", sizeof("W 268436224 4\n"));
-	txString("ASDA", sizeof("ASDA"));
 	Sleep(500);
 	rx(5000, rxString);
+	// Cat
+	// Dec = 312
+	// Hex = 198
+	// 0 + 86 + 37 + 84 = 2076  Dec
+	// 0 + 56 + 25 + 54 Hex
+	txString("#0V%T\n178\n", sizeof("#0V%T\n178\n"));
+	
+	//int blah  = '$' + '0' + 'V' + '%' + 'T';
+	//int blah  = "3";
+	//printf("ASDDDDDDDDDDDDDDD %i\n", blah);
+
+	Sleep(500);
+	rx(5000, rxString);
+
+	// Read memory
+	txString("R 268436224 4\n", sizeof("R 268436224 4\n"));
+	Sleep(500);
+	rx(5000, rxString);
+	txString("OK\n", sizeof("OK\n"));
+	Sleep(500);
+	rx(5000, rxString);
+
+	//txString("#0V%T\n", sizeof("#0V%T\n"));
+	//Sleep(500);
+	//rx(5000, rxString);
 
 	//Let's close the serial port.
 	if(FT_Close(handle) != FT_OK) {
@@ -320,6 +332,28 @@ unsigned char set_ISP_mode()
 	//return 1;
 }
 
+unsigned char get_LPC_Info()
+{
+	unsigned char rxString[256];
+
+	// Read Part ID
+	txString("J\n", sizeof("J\n"));
+	Sleep(500);
+	printf("Read Part ID:\n");
+	rx(5000, rxString);
+
+	// Boot Version
+	txString("K\n", sizeof("K\n"));
+	Sleep(500);
+	printf("Read Boot Version:\n");
+	rx(5000, rxString);
+
+	// Read Part ID
+	txString("N\n", sizeof("N\n"));
+	Sleep(500);
+	printf("Read UID:\n");
+	rx(5000, rxString);
+}
 ///////////// FTDI  //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -388,7 +422,7 @@ unsigned char * rx(int timeout, unsigned char *rxString)
 		else {
 			printf("RX FAILED \n");
 		}
-		printf("\n");
+		//printf("\n");
 	}
 }
 

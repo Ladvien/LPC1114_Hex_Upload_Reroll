@@ -224,7 +224,7 @@ int main(int argc, char *argv[])
 	UUE_Data = UUencode();
 
 	writeUUEDataTofile(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index);
-
+	/*
 	// Set LPC into ISP mode.
 	set_ISP_mode();
 
@@ -251,24 +251,25 @@ int main(int argc, char *argv[])
 	Sleep(500);
 	rx(5000, rxString);
 
-
-	// Write memory
-	txString("W 268436224 4\n", sizeof("W 268436224 4\n"));
-	Sleep(500);
-	rx(5000, rxString);
-	// Cat
-	// Dec = 312
-	// Hex = 198
-	// 0 + 86 + 37 + 84 = 2076  Dec
-	// 0 + 56 + 25 + 54 Hex
-	txString("#0V%T\n178\n", sizeof("#0V%T\n178\n"));
 	
-	//int blah  = '$' + '0' + 'V' + '%' + 'T';
-	//int blah  = "3";
-	//printf("ASDDDDDDDDDDDDDDD %i\n", blah);
 
-	Sleep(500);
-	rx(5000, rxString);
+
+		// Write memory
+		txString("W 268436224 8\n", sizeof("W 268436224 8\n"));
+		Sleep(500);
+		rx(5000, rxString);
+
+		txString("(5&AE(&-A<@\n403\n", sizeof("(5&AE(&-A<@\n403\n"));
+		
+		// TEST
+		// HEX: 54 68 65 20 63 61 72
+		// DECL 84  104 101 32 99 97
+		// UUE: 5&AE(&-A
+
+		printf("THIS NUMBER: %i\n", "RESEND");
+
+		Sleep(500);
+		rx(5000, rxString);
 
 	// Read memory
 	txString("R 268436224 4\n", sizeof("R 268436224 4\n"));
@@ -281,6 +282,7 @@ int main(int argc, char *argv[])
 	//txString("#0V%T\n", sizeof("#0V%T\n"));
 	//Sleep(500);
 	//rx(5000, rxString);
+	*/
 
 	//Let's close the serial port.
 	if(FT_Close(handle) != FT_OK) {
@@ -615,6 +617,7 @@ struct hexFile hexFileToCharArray()
 	int charsThisLine;
 	//Holds line count.
 	
+	unsigned short int fullAddress;
 	struct hexFile hexFile;
 
 	//Loop through each character until EOF.
@@ -626,9 +629,16 @@ struct hexFile hexFileToCharArray()
 		//ADDRESS1 //Will create an 8 bit shift. --Bdk6's
 		hexFile.fhexAddress1[i] = readByte();
 		
+		// Tutorial for converting 16 bits to int.
+		// http://homepage.cs.uiowa.edu/~jones/bcd/decimal.html
 		//ADDRESS2
 		hexFile.fhexAddress2[i] = readByte();
-		
+		fullAddress = hexFile.fhexAddress1[i];
+		fullAddress <<= 8;
+		fullAddress |= hexFile.fhexAddress2[i];
+		// | hexFile.fhexAddress1[i]		
+		printf("%02X %02X\n", hexFile.fhexAddress1[i], hexFile.fhexAddress2[i]);
+
 		//addressCombine();
 		
 		//RECORD TYPE

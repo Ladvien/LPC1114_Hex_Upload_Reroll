@@ -158,7 +158,7 @@ struct UUE_Data{
 };
 
 
-
+int fullAddress = 0;
 ///////////////////// PROGRAM ////////////////////////////
 ////////////////////// START /////////////////////////////
 
@@ -611,14 +611,14 @@ int readByte(){
 //Convert file to one long char array.
 struct hexFile hexFileToCharArray()
 {
+	struct hexFile hexFile;
+
 	//To count through all characters in the file.
 	int i = 0;
 	int hexDataIndex = 0;
+
+	//Holds line count.	
 	int charsThisLine;
-	//Holds line count.
-	
-	unsigned short int fullAddress;
-	struct hexFile hexFile;
 
 	//Loop through each character until EOF.
 	while(totalCharsRead  < fileSize){
@@ -629,37 +629,53 @@ struct hexFile hexFileToCharArray()
 		//ADDRESS1 //Will create an 8 bit shift. --Bdk6's
 		hexFile.fhexAddress1[i] = readByte();
 		
-		// Tutorial for converting 16 bits to int.
-		// http://homepage.cs.uiowa.edu/~jones/bcd/decimal.html
 		//ADDRESS2
 		hexFile.fhexAddress2[i] = readByte();
-		fullAddress = hexFile.fhexAddress1[i];
-		fullAddress <<= 8;
-		fullAddress |= hexFile.fhexAddress2[i];
-		// | hexFile.fhexAddress1[i]		
-		printf("%02X %02X\n", hexFile.fhexAddress1[i], hexFile.fhexAddress2[i]);
-
+		
+		// Tutorial for converting 16 bits to int.
+		// http://homepage.cs.uiowa.edu/~jones/bcd/decimal.html
+		//printf("%02X %02X\n", hexFile.fhexAddress1[i], hexFile.fhexAddress2[i]);
+		//printf("A: %i  B: %i\n", hexFile.fhexAddress1[i], hexFile.fhexAddress2[i]);
+		//printf("%hu\n", fullAddress);
 		//addressCombine();
 		
 		//RECORD TYPE
 		hexFile.fhexRecordType[i] = readByte();	
+
+		if (hexFile.fhexRecordType[i] == 0)
+		{
+			fullAddress = hexFile.fhexAddress1[i];
+			fullAddress <<= 8;
+			fullAddress |= hexFile.fhexAddress2[i];
+			fullAddress =  fullAddress/16;
+			printf("%i\n", fullAddress);
+		}
 		
+		//printf("%02X %02X\n", hexFile.fhexAddress1[i], hexFile.fhexAddress2[i]);
+		//printf("A: %i  B: %i\n", hexFile.fhexAddress1[i], hexFile.fhexAddress2[i]);
+		
+
 		//Throws the byte count (data bytes in this line) into an integer.
 		charsThisLine = hexFile.fhexByteCount[i];
 
 		//////// DATA ///////////////////
-		while (hexDataIndex != charsThisLine && totalCharsRead  < fileSize && charsThisLine != 0x00)
+		// We only want data.
+		if (hexFile.fhexRecordType[i] == 0)
 		{
-			//Store the completed hex value in the char array.
-			hexFile.fileData_Hex_String[hexFile.fileData_Hex_String_Size] = readByte();
-			
-			//Index for data.
-			hexFile.fileData_Hex_String_Size++;
-			//Index for loop.
-			hexDataIndex++;
-		}
+			while (hexDataIndex != charsThisLine && totalCharsRead  < fileSize && charsThisLine != 0x00)
+			{
+				//Store the completed hex value in the char array.
+				hexFile.fileData_Hex_String[hexFile.fileData_Hex_String_Size] = readByte();
+				
+				//Index for data.
+				hexFile.fileData_Hex_String_Size++;
+				//Index for loop.
+				hexDataIndex++;
+			}
 		//Reset loop index.
 		hexDataIndex=0;
+		}
+
 		
 		//////// CHECK SUM //////////////
 		if (charToPut != 0xFF){

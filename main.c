@@ -54,7 +54,7 @@ void writeHexDataTofile(unsigned char fileData_Hex_String[], int hexDataCharCoun
 
 // FTDI
 static FILE *open_file ( char *file, char *mode );
-void fileSizer();
+int fileSizer();
 unsigned char * rx(int timeout, unsigned char *rxString);
 char txString(char string[], int txString_size);
 
@@ -109,6 +109,7 @@ struct UUE_Data UUencode();
 
 
 #define MAX_SIZE 32768
+#define MAX_SIZE_8 4096
 
 //Serial Port handle.
 FT_HANDLE handle = NULL;
@@ -127,9 +128,6 @@ FILE *fileIn;
 FILE *hexDataFile;
 FILE *UUEDataFile;
 
-int fileSize = 0;
-
-
 //Reading characters from a file.
 unsigned char charToPut;
 
@@ -139,12 +137,12 @@ int totalCharsRead = 0;
 struct hexFile {
 	//To hold file hex values.
 	unsigned char fileData_Hex_String[MAX_SIZE];
-	int fileData_Hex_String_Size; unsigned char fhexByteCount[MAX_SIZE];
+	int fileData_Hex_String_Size; unsigned char fhexByteCount[MAX_SIZE_8];
 	int hexFileLineCount;
-	unsigned char fhexAddress1[MAX_SIZE];
-	unsigned char fhexAddress2[MAX_SIZE];
-	unsigned char fhexRecordType[MAX_SIZE];
-	unsigned char fhexCheckSum[MAX_SIZE];
+	unsigned char fhexAddress1[MAX_SIZE_8];
+	unsigned char fhexAddress2[MAX_SIZE_8];
+	unsigned char fhexRecordType[MAX_SIZE_8];
+	unsigned char fhexCheckSum[MAX_SIZE_8];
 
 };
 
@@ -175,6 +173,9 @@ int main(int argc, char *argv[])
 	unsigned char CTS_Switch;
 
 	unsigned char rxString[256];
+
+	// Stores file size.
+	int fileSize;
 
 	//If the user fails to give us two arguments yell at him.	
 	if ( argc != 2 ) {
@@ -208,14 +209,11 @@ int main(int argc, char *argv[])
 	//Setup serial port, even though we are banging.
 	FT_SetBaudRate(handle, 9600);  //* Actually 9600 * 16
 
-	//Sizes file to be used in data handling.
-	fileSizer();
-	
-	//Convert file to one long char array.
-	hexFile = hexFileToCharArray();
+	// Sizes file to be used in data handling.
+	fileSize = fileSizer();
 
-	//int dataLinesInFile = sizeof(hexFile.hexFileLineCount);
-	//printf("%i\n", hexFile.hexFileLineCount);
+	//Convert file to one long char array.
+	hexFile = hexFileToCharArray(fileSize);
 
 	// Write hex string back to a file.  Used for debugging.
 	writeHexDataTofile(hexFile.fileData_Hex_String, hexFile.fileData_Hex_String_Size, hexFile.fhexByteCount, hexFile.hexFileLineCount);
@@ -372,13 +370,15 @@ static FILE *open_file ( char *file, char *mode )
   return fileOpen;
 }
 
-void fileSizer()
+int fileSizer()
 {
+	int fileSize;
 	while((fgetc (fileIn)) != EOF)
 	{
 		fileSize++;
 	}
 	rewind(fileIn);
+	return fileSize;
 }
 
 unsigned char * rx(int timeout, unsigned char *rxString)
@@ -609,7 +609,7 @@ int readByte(){
 
 
 //Convert file to one long char array.
-struct hexFile hexFileToCharArray()
+struct hexFile hexFileToCharArray(int fileSize)
 {
 	struct hexFile hexFile;
 

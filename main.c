@@ -57,6 +57,7 @@ static FILE *open_file ( char *file, char *mode );
 int fileSizer();
 unsigned char * rx(int timeout, unsigned char *rxString);
 char txString(char string[], int txString_size);
+int FTDI_State_Machine(int operation);
 
 // LPC handling
 unsigned char set_ISP_mode();
@@ -107,14 +108,16 @@ struct UUE_Data UUencode();
 #define LPC_CHECK "?"
 #define Synchronized "Synchronized\n"
 
+// FTDI
+#define FT_Attempts 5
 
 #define MAX_SIZE 32768
-#define MAX_SIZE_8 4096
+#define MAX_SIZE_16 2048
 
 //Serial Port handle.
+//Used by FTD2XX
 FT_HANDLE handle = NULL;
 FT_STATUS FT_status;
-//Used by FTD2XX
 DWORD EventDWord;
 DWORD TxBytes;
 DWORD bytes;
@@ -123,7 +126,6 @@ DWORD BytesReceived;
 unsigned char RxBuffer[256];
 
 //File to be loaded.	
-
 FILE *fileIn;
 FILE *hexDataFile;
 FILE *UUEDataFile;
@@ -137,12 +139,12 @@ int totalCharsRead = 0;
 struct hexFile {
 	//To hold file hex values.
 	unsigned char fileData_Hex_String[MAX_SIZE];
-	int fileData_Hex_String_Size; unsigned char fhexByteCount[MAX_SIZE_8];
+	int fileData_Hex_String_Size; unsigned char fhexByteCount[MAX_SIZE_16];
 	int hexFileLineCount;
-	unsigned char fhexAddress1[MAX_SIZE_8];
-	unsigned char fhexAddress2[MAX_SIZE_8];
-	unsigned char fhexRecordType[MAX_SIZE_8];
-	unsigned char fhexCheckSum[MAX_SIZE_8];
+	unsigned char fhexAddress1[MAX_SIZE_16];
+	unsigned char fhexAddress2[MAX_SIZE_16];
+	unsigned char fhexRecordType[MAX_SIZE_16];
+	unsigned char fhexCheckSum[MAX_SIZE_16];
 
 };
 
@@ -154,6 +156,14 @@ struct UUE_Data{
 	int paddedIndex;
 	int UUE_Encoded_String_Index;
 };
+
+
+// Handling FTDI state machine.
+typedef enum {
+    OPEN,
+   	RESET,
+    CLOSE,
+} operation;
 
 
 int fullAddress = 0;
@@ -177,6 +187,9 @@ int main(int argc, char *argv[])
 	// Stores file size.
 	int fileSize;
 
+	// Local for FTDI State Machine.
+	operation FTDI_Operation = CLOSE;
+
 	//If the user fails to give us two arguments yell at him.	
 	if ( argc != 2 ) {
 		fprintf ( stderr, "Usage: %s <readfile1>\n", argv[0] );
@@ -186,20 +199,11 @@ int main(int argc, char *argv[])
 	//Open file using command-line info; for reading.
 	fileIn = open_file (argv[1], "rb" );
 	
-	// Initialize, open device, set bitbang mode w/5 outputs
-	if(FT_Open(0, &handle) != FT_OK) {
-		puts("Can't open device");
-		return 1;
-	}
+	// Open FTDI.
+	FTDI_State_Machine(OPEN, FT_Attempts);
 
 	// Strange, this has to happen to get a response from the device.
-	FT_status = FT_ResetPort(handle);
-	if (FT_status == FT_OK) {
-		printf("%s\n", "Reset the FTDI.");
-	}
-	else {
-		// FT_ResetDevice failed
-	}
+	FTDI_State_Machine(RESET, FT_Attempts);	 
 	
 	// Holds FTDI handle status.
 	FT_status = FT_Open(0, &handle);
@@ -222,10 +226,10 @@ int main(int argc, char *argv[])
 	UUE_Data = UUencode();
 
 	writeUUEDataTofile(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index);
-	/*
+	
 	// Set LPC into ISP mode.
 	set_ISP_mode();
-
+	/*
 	//Sleep(500);
 	//txString(HM_RESET, sizeof(HM_RESET));
 	
@@ -282,16 +286,11 @@ int main(int argc, char *argv[])
 	//rx(5000, rxString);
 	*/
 
-	//Let's close the serial port.
-	if(FT_Close(handle) != FT_OK) {
-		puts("Can't close device");
-		return 1;
-	}
-
 	//Close files.
 	fclose ( fileIn );
 	fclose ( UUEDataFile );
 	fclose ( hexDataFile );
+
 } // END PROGRAM
 
 
@@ -356,7 +355,57 @@ unsigned char get_LPC_Info()
 }
 ///////////// FTDI  //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
+int FTDI_State_Machine(int operation, FT_Attempts)
+{
+	switch(operation)
+	{
+		case OPEN: 
+			// Initialize, open device, set bitbang mode w/5 outputs
+			for (int i = 0; i < FT_Attempts; ++i)
+			{
+				FT_Open(0, &handle);
+				if (FT_status != FT_OK)
+				{
+					printf("Could not open FTDI device. Attempt %i\n", i);
+					Sleep(100);
+				}
+				else
+				{
+					break;
+				}
 
+			}
+		case RESET: 
+			for (int i = 0; i < FT_Attempts; ++i)
+			{
+				FT_ResetPort(handle);
+				if (FT_status != FT_OK)
+				{
+					printf("Could not reset FTDI device. Attempt %i\n", i);
+					Sleep(100);
+				}
+				else
+				{
+					break;
+				}
+			}
+		case CLOSE:
+			//Let's close the serial port.
+			for (int i = 0; i < FT_Attempts; ++i)
+			{
+				FT_Close(handle);
+				if (FT_status != FT_OK)
+				{
+					printf("Could not close FTDI device. Attempt %i\n", i);
+					Sleep(100);
+				}
+				else
+				{
+					break;
+				}
+			}
+	}
+}
 //Open file for reading, function.
 static FILE *open_file ( char *file, char *mode )
 {

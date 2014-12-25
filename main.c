@@ -57,7 +57,7 @@ static FILE *open_file ( char *file, char *mode );
 int fileSizer();
 unsigned char * rx(int timeout, unsigned char *rxString);
 char txString(char string[], int txString_size);
-int FTDI_State_Machine(int operation);
+int FTDI_State_Machine(int operation, int FT_Attempts);
 
 // LPC handling
 unsigned char set_ISP_mode();
@@ -109,7 +109,7 @@ struct UUE_Data UUencode();
 #define Synchronized "Synchronized\n"
 
 // FTDI
-#define FT_Attempts 5
+#define FT_ATTEMPTS 5
 
 #define MAX_SIZE 32768
 #define MAX_SIZE_16 2048
@@ -167,6 +167,7 @@ typedef enum {
 
 
 int fullAddress = 0;
+
 ///////////////////// PROGRAM ////////////////////////////
 ////////////////////// START /////////////////////////////
 
@@ -200,14 +201,11 @@ int main(int argc, char *argv[])
 	fileIn = open_file (argv[1], "rb" );
 	
 	// Open FTDI.
-	FTDI_State_Machine(OPEN, FT_Attempts);
+	FTDI_State_Machine(OPEN, FT_ATTEMPTS);
 
 	// Strange, this has to happen to get a response from the device.
-	FTDI_State_Machine(RESET, FT_Attempts);	 
+	FTDI_State_Machine(RESET, FT_ATTEMPTS);	 
 	
-	// Holds FTDI handle status.
-	FT_status = FT_Open(0, &handle);
-
 	//Set up pins we will use.
 	//FT_SetBitMode(handle, PIN_DTR | PIN_CTS, 1);
 	//Setup serial port, even though we are banging.
@@ -228,7 +226,22 @@ int main(int argc, char *argv[])
 	writeUUEDataTofile(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index);
 	
 	// Set LPC into ISP mode.
-	set_ISP_mode();
+	for (int i = 0; i < FT_ATTEMPTS; ++i)
+	{
+		int returnVal = 0;
+		returnVal = set_ISP_mode();
+		printf("RETURN VAL: %i\n", returnVal);
+		if (returnVal)
+		{
+			break;
+		}
+		else
+		{
+			printf("Can't contact LPC\n");
+		}
+		
+	}
+	
 	/*
 	//Sleep(500);
 	//txString(HM_RESET, sizeof(HM_RESET));
@@ -328,7 +341,7 @@ unsigned char set_ISP_mode()
 
 	// CHECK IF IN RESET MODE
 
-	//return 1;
+	return 1;
 }
 
 unsigned char get_LPC_Info()
@@ -352,18 +365,23 @@ unsigned char get_LPC_Info()
 	Sleep(500);
 	printf("Read UID:\n");
 	rx(5000, rxString);
+
+	// ADD PARSING AND PRINTING
 }
 ///////////// FTDI  //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
-int FTDI_State_Machine(int operation, FT_Attempts)
+int FTDI_State_Machine(int operation, int FT_Attempts)
 {
 	switch(operation)
 	{
 		case OPEN: 
-			// Initialize, open device, set bitbang mode w/5 outputs
+			// Loop for command attempts.
 			for (int i = 0; i < FT_Attempts; ++i)
 			{
+				// FT command
 				FT_Open(0, &handle);
+				Sleep(100);
+				printf("TEST!!!\n");
 				if (FT_status != FT_OK)
 				{
 					printf("Could not open FTDI device. Attempt %i\n", i);
@@ -371,9 +389,8 @@ int FTDI_State_Machine(int operation, FT_Attempts)
 				}
 				else
 				{
-					break;
+					return 1;
 				}
-
 			}
 		case RESET: 
 			for (int i = 0; i < FT_Attempts; ++i)
@@ -386,11 +403,10 @@ int FTDI_State_Machine(int operation, FT_Attempts)
 				}
 				else
 				{
-					break;
+					return 1;
 				}
 			}
 		case CLOSE:
-			//Let's close the serial port.
 			for (int i = 0; i < FT_Attempts; ++i)
 			{
 				FT_Close(handle);
@@ -401,11 +417,12 @@ int FTDI_State_Machine(int operation, FT_Attempts)
 				}
 				else
 				{
-					break;
+					return 1;
 				}
 			}
 	}
 }
+
 //Open file for reading, function.
 static FILE *open_file ( char *file, char *mode )
 {

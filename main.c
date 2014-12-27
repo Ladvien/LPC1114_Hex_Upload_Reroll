@@ -160,17 +160,19 @@ struct UUE_Data{
 
 // States for FTDI state machine.
 typedef enum {
-    OPEN,
-   	RESET,
-    CLOSE,
+    FTDI_SM_OPEN,
+   	FTDI_SM_RESET,
+    FTDI_SM_CLOSE,
+    FTDI_SM_ERROR,
 } FTDI_state;
 
 // States for RX state machine.
 typedef enum {
-	NO_DATA,
-	INCOMPLETE,
-	COMPLETE,
-	COMPINCDATA,
+	RX_NODATA,
+	RX_INCOMPLETE,
+	RX_COMPLETE,
+	RX_COMP_AND_INC_DATA,
+	RX_ERROR,
 } RX_state;
 
 int fullAddress = 0;
@@ -196,7 +198,7 @@ int main(int argc, char *argv[])
 	int fileSize;
 
 	// Local for FTDI State Machine.
-	FTDI_state FTDI_Operation = CLOSE;
+	//FTDI_state FTDI_Operation = RX_CLOSE;
 
 	//If the user fails to give us two arguments yell at him.	
 	if ( argc != 2 ) {
@@ -208,10 +210,10 @@ int main(int argc, char *argv[])
 	fileIn = open_file (argv[1], "rb" );
 	
 	// Open FTDI.
-	FTDI_State_Machine(OPEN, FT_ATTEMPTS);
+	FTDI_State_Machine(FTDI_SM_OPEN, FT_ATTEMPTS);
 
 	// Strange, this has to happen to get a response from the device.
-	FTDI_State_Machine(RESET, FT_ATTEMPTS);	 
+	FTDI_State_Machine(FTDI_SM_RESET, FT_ATTEMPTS);	 
 	
 	//Set up pins we will use.
 	//FT_SetBitMode(handle, PIN_DTR | PIN_CTS, 1);
@@ -377,11 +379,12 @@ unsigned char get_LPC_Info()
 }
 ///////////// FTDI  //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
+
 int FTDI_State_Machine(int state, int FT_Attempts)
 {
 	switch(state)
 	{
-		case OPEN: 
+		case FTDI_SM_OPEN: 
 			// Loop for command attempts.
 			for (int i = 0; i < FT_Attempts; ++i)
 			{
@@ -397,7 +400,7 @@ int FTDI_State_Machine(int state, int FT_Attempts)
 					return 1;
 				}
 			}
-		case RESET: 
+		case FTDI_SM_RESET: 
 			for (int i = 0; i < FT_Attempts; ++i)
 			{
 				FT_ResetPort(handle);
@@ -411,7 +414,7 @@ int FTDI_State_Machine(int state, int FT_Attempts)
 					return 1;
 				}
 			}
-		case CLOSE:
+		case FTDI_SM_CLOSE:
 			for (int i = 0; i < FT_Attempts; ++i)
 			{
 				FT_Close(handle);
@@ -425,6 +428,9 @@ int FTDI_State_Machine(int state, int FT_Attempts)
 					return 1;
 				}
 			}
+		case FTDI_SM_ERROR:
+			printf("Error in FTDI SM call.");
+			break;
 	}
 }
 
@@ -457,13 +463,26 @@ unsigned char rx(int RX_state)
 {
 	switch(RX_state)
 		{
-			case NODATA:
+			case RX_NODATA:
+				FT_GetQueueStatus(handle,&RxBytes);
+				if (RxBytes > 0)
+					{
+						RX_state = RX_INCOMPLETE;
+					}			
+				else {
+					return RX_NODATA; // Code for no data.
+				}
+			case RX_INCOMPLETE:
+				printf("RX_INCOMPLETE\n");
 				break;
-			case COMPLETE:
+			case RX_COMPLETE:
+				printf("RX_COMPLETE\n");
 				break;
-			case INCOMPLETE:
+			case RX_COMP_AND_INC_DATA:
+				printf("RX_COMP_AND_INC_DATA\n");
 				break;
-			case COMPINCDATA:
+			case RX_ERROR:
+				printf("Error while receiving data.\n");
 				break;
 		}
 }

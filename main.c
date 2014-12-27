@@ -167,7 +167,7 @@ typedef enum {
 
 // States for RX state machine.
 typedef enum {
-	NODATA,
+	NO_DATA,
 	INCOMPLETE,
 	COMPLETE,
 	COMPINCDATA,
@@ -458,13 +458,13 @@ unsigned char rx(int RX_state)
 	switch(RX_state)
 		{
 			case NODATA:
-
+				break;
 			case COMPLETE:
-
+				break;
 			case INCOMPLETE:
-
+				break;
 			case COMPINCDATA:
-			
+				break;
 		}
 }
 

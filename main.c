@@ -55,9 +55,9 @@ void writeHexDataTofile(unsigned char fileData_Hex_String[], int hexDataCharCoun
 // FTDI
 static FILE *open_file ( char *file, char *mode );
 int fileSizer();
-unsigned char * rx(int timeout, unsigned char *rxString);
+unsigned char rx(int RX_state);
 char txString(char string[], int txString_size);
-int FTDI_State_Machine(int operation, int FT_Attempts);
+int FTDI_State_Machine(int state, int FT_Attempts);
 
 // LPC handling
 unsigned char set_ISP_mode();
@@ -158,13 +158,20 @@ struct UUE_Data{
 };
 
 
-// Handling FTDI state machine.
+// States for FTDI state machine.
 typedef enum {
     OPEN,
    	RESET,
     CLOSE,
-} operation;
+} FTDI_state;
 
+// States for RX state machine.
+typedef enum {
+	NODATA,
+	INCOMPLETE,
+	COMPLETE,
+	COMPINCDATA,
+} RX_state;
 
 int fullAddress = 0;
 
@@ -189,7 +196,7 @@ int main(int argc, char *argv[])
 	int fileSize;
 
 	// Local for FTDI State Machine.
-	operation FTDI_Operation = CLOSE;
+	FTDI_state FTDI_Operation = CLOSE;
 
 	//If the user fails to give us two arguments yell at him.	
 	if ( argc != 2 ) {
@@ -316,28 +323,28 @@ unsigned char set_ISP_mode()
 
 	txString(HM_ISP_LOW, sizeof(HM_ISP_LOW));
 	Sleep(500);
-	rx(5000, rxString);
+	rx(1);
 
 	txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW));
 	Sleep(500);
-	rx(5000, rxString);
+	rx(1);
 
 	txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH));
 	Sleep(500);
-	rx(5000, rxString);
+	rx(1);
 
 	txString(HM_ISP_HIGH, sizeof(HM_ISP_HIGH));
 	Sleep(500);
-	rx(5000, rxString);
+	rx(1);
 
 	// Synchronized check.
 	txString(LPC_CHECK, sizeof(LPC_CHECK));
 	Sleep(500);
-	rx(5000, rxString);
+	rx(1);
 
 	txString(Synchronized, sizeof(Synchronized));
 	Sleep(500);
-	rx(5000, rxString);
+	rx(1);
 
 	// CHECK IF IN RESET MODE
 
@@ -352,27 +359,27 @@ unsigned char get_LPC_Info()
 	txString("J\n", sizeof("J\n"));
 	Sleep(500);
 	printf("Read Part ID:\n");
-	rx(5000, rxString);
+	rx(1);
 
 	// Boot Version
 	txString("K\n", sizeof("K\n"));
 	Sleep(500);
 	printf("Read Boot Version:\n");
-	rx(5000, rxString);
+	rx(1);
 
 	// Read Part ID
 	txString("N\n", sizeof("N\n"));
 	Sleep(500);
 	printf("Read UID:\n");
-	rx(5000, rxString);
+	rx(1);
 
 	// ADD PARSING AND PRINTING
 }
 ///////////// FTDI  //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
-int FTDI_State_Machine(int operation, int FT_Attempts)
+int FTDI_State_Machine(int state, int FT_Attempts)
 {
-	switch(operation)
+	switch(state)
 	{
 		case OPEN: 
 			// Loop for command attempts.
@@ -380,8 +387,6 @@ int FTDI_State_Machine(int operation, int FT_Attempts)
 			{
 				// FT command
 				FT_Open(0, &handle);
-				Sleep(100);
-				printf("TEST!!!\n");
 				if (FT_status != FT_OK)
 				{
 					printf("Could not open FTDI device. Attempt %i\n", i);
@@ -447,6 +452,23 @@ int fileSizer()
 	return fileSize;
 }
 
+
+unsigned char rx(int RX_state)
+{
+	switch(RX_state)
+		{
+			case NODATA:
+
+			case COMPLETE:
+
+			case INCOMPLETE:
+
+			case COMPINCDATA:
+			
+		}
+}
+
+/*
 unsigned char * rx(int timeout, unsigned char *rxString)
 {
 	// Less than ~40ms and characters get garbled?
@@ -476,7 +498,7 @@ unsigned char * rx(int timeout, unsigned char *rxString)
 					RxBuffer[i] = 'N';
 				}
 			}
-*/
+
 
 			// Print data.
 			//printf("RX: %s ------------ RxBytes: %i BytesReceived: %i\n",RxBuffer, RxBytes, BytesReceived);
@@ -493,6 +515,8 @@ unsigned char * rx(int timeout, unsigned char *rxString)
 		//printf("\n");
 	}
 }
+
+*/
 
 char txString(char string[], int txString_size)
 {

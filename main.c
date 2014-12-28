@@ -461,19 +461,66 @@ int fileSizer()
 
 unsigned char rx(int RX_state)
 {
+	unsigned char error[32];
+
 	switch(RX_state)
 		{
+			
 			case RX_NODATA:
+				// Check if we Rx'ed any bytes.
 				FT_GetQueueStatus(handle,&RxBytes);
 				if (RxBytes > 0)
 					{
+						// We did, let's tell the machine to look over the bytes
+						// for completeness.
 						RX_state = RX_INCOMPLETE;
 					}			
 				else {
-					return RX_NODATA; // Code for no data.
+					// We received no data.  Set error code and proceed to error state.
+					strncpy(error, "No data to receive.", sizeof("No data to receive."));
+					RX_state = RX_ERROR;
 				}
+
+
 			case RX_INCOMPLETE:
-				printf("RX_INCOMPLETE\n");
+				// We have some data, let's see how complete it is.
+				// First, we receive it.
+				FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
+				FT_status = FT_Read(handle,RxBuffer,RxBytes,&BytesReceived);
+				
+				//If the read was good.
+				if (FT_status == FT_OK) {
+					
+					// Does the RxBuffer contain an CR LF string?
+					unsigned char *blah = strstr(RxBuffer, "\r\n");
+					// If it does contain CR LF
+					if(blah != '\0')
+						{
+							// Let's replace CR LF with "  ".
+							int replaceIndex = 0;
+							printf("RX: ");
+							while(RxBuffer[replaceIndex] != 0x00)
+								{
+									if(RxBuffer[replaceIndex] == '\r' || RxBuffer[replaceIndex] == '\n'){putchar(' ');}
+									else{{putchar(RxBuffer[replaceIndex]);}									}
+									replaceIndex++;
+								}
+							// Silly, but let's add our own LF.
+							printf("\n");
+					}
+					// If the RX'ed data does not contain CR LF string.
+					else
+					{
+						// Let's print what's in the buffer and add a LF.
+						printf("RX: %s\n", RxBuffer);
+					}
+				}
+				else
+				{
+					strncpy(error, "Problem with reading incomplete data.", sizeof("Problem with reading incomplete data."));
+					RX_state = RX_ERROR;
+				}
+				//printf("RX_INCOMPLETE\n");
 				break;
 			case RX_COMPLETE:
 				printf("RX_COMPLETE\n");
@@ -482,7 +529,7 @@ unsigned char rx(int RX_state)
 				printf("RX_COMP_AND_INC_DATA\n");
 				break;
 			case RX_ERROR:
-				printf("Error while receiving data.\n");
+				printf("Error: %s\n", error);
 				break;
 		}
 }
@@ -544,7 +591,18 @@ char txString(char string[], int txString_size)
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
 		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), &bytes);
 	}	
-	printf("TX: %s\n", string);
+
+	// Let's check if the send string contains a newline character.
+	unsigned char * newLineTest = strstr(string, "\n");
+	// No? Let's add it.
+	if (newLineTest == '\0')
+	{
+		printf("TX: %s\n", string);
+	}
+	else{
+		printf("TX: %s", string);	
+	}
+	
 }
 
 ///////////// Debugging //////////////////////////////////////////////////////////////////////

@@ -11,7 +11,9 @@
 #include <winbase.h>
 #include <string.h>
 #include <math.h>
+#include <stdbool.h>
 #include "ftd2xx.h"
+
 /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 A. Preparing the data.
 1. Hex file accessed. (DONE) I noticed the FTDI chip needs to be using XON/XOFF, I assume I can use FTDI’s library to enable this functionality?
@@ -55,7 +57,8 @@ void writeHexDataTofile(unsigned char fileData_Hex_String[], int hexDataCharCoun
 // FTDI
 static FILE *open_file ( char *file, char *mode );
 int fileSizer();
-unsigned char rx(int RX_state);
+unsigned char rx();
+unsigned char parseRX();
 char txString(char string[], int txString_size);
 int FTDI_State_Machine(int state, int FT_Attempts);
 
@@ -459,80 +462,70 @@ int fileSizer()
 }
 
 
-unsigned char rx(int RX_state)
+unsigned char rx(int device)
 {
-	unsigned char error[32];
-
-	switch(RX_state)
-		{
-			
-			case RX_NODATA:
-				// Check if we Rx'ed any bytes.
-				FT_GetQueueStatus(handle,&RxBytes);
-				if (RxBytes > 0)
-					{
-						// We did, let's tell the machine to look over the bytes
-						// for completeness.
-						RX_state = RX_INCOMPLETE;
-					}			
-				else {
-					// We received no data.  Set error code and proceed to error state.
-					strncpy(error, "No data to receive.", sizeof("No data to receive."));
-					RX_state = RX_ERROR;
-				}
-
-
-			case RX_INCOMPLETE:
-				// We have some data, let's see how complete it is.
-				// First, we receive it.
-				FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
-				FT_status = FT_Read(handle,RxBuffer,RxBytes,&BytesReceived);
-				
-				//If the read was good.
-				if (FT_status == FT_OK) {
-					
-					// Does the RxBuffer contain an CR LF string?
-					unsigned char *blah = strstr(RxBuffer, "\r\n");
-					// If it does contain CR LF
-					if(blah != '\0')
-						{
-							// Let's replace CR LF with "  ".
-							int replaceIndex = 0;
-							printf("RX: ");
-							while(RxBuffer[replaceIndex] != 0x00)
-								{
-									if(RxBuffer[replaceIndex] == '\r' || RxBuffer[replaceIndex] == '\n'){putchar(' ');}
-									else{{putchar(RxBuffer[replaceIndex]);}									}
-									replaceIndex++;
-								}
-							// Silly, but let's add our own LF.
-							printf("\n");
-					}
-					// If the RX'ed data does not contain CR LF string.
-					else
-					{
-						// Let's print what's in the buffer and add a LF.
-						printf("RX: %s\n", RxBuffer);
-					}
-				}
-				else
-				{
-					strncpy(error, "Problem with reading incomplete data.", sizeof("Problem with reading incomplete data."));
-					RX_state = RX_ERROR;
-				}
-				//printf("RX_INCOMPLETE\n");
-				break;
-			case RX_COMPLETE:
-				printf("RX_COMPLETE\n");
-				break;
-			case RX_COMP_AND_INC_DATA:
-				printf("RX_COMP_AND_INC_DATA\n");
-				break;
-			case RX_ERROR:
-				printf("Error: %s\n", error);
-				break;
+	//FT_SetTimeouts(handle, timeout, 0);
+	FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
+	if (RxBytes > 0) {
+		FT_status = FT_Read(handle,RxBuffer,RxBytes,&BytesReceived);
+		if (FT_status == FT_OK) {
+			while(parseRX()!=true);			
 		}
+		else {
+			printf("RX FAILED \n");
+		}
+	}
 }
+
+
+unsigned char parseRX()
+{
+		// GET DATA
+		
+		// Print data.
+		//printf("RX: %s\n", RxBuffer);
+
+		bool successful = false;
+
+		// Does the RxBuffer contain an CR LF string?
+		unsigned char *CR_LF_CHK = strstr(RxBuffer, "\r\n");
+		// If it does contain CR LF
+		if(CR_LF_CHK != '\0')
+		{
+				// Let's replace CR LF with "  ".
+				int replaceIndex = 0;
+				printf("RX: ");
+				while(RxBuffer[replaceIndex] != 0x00)
+					{
+						if(RxBuffer[replaceIndex] == '\r' || RxBuffer[replaceIndex] == '\n'){successful = true;;}
+						else{putchar(RxBuffer[replaceIndex]);}									
+						replaceIndex++;
+					}
+				// Silly, but let's add our own LF.
+				printf("\n");
+		}
+		
+		// If the RX'ed data does not contain CR LF string.
+		else
+		{
+			// Let's print what's in the buffer and add a LF.
+			printf("RX: %s\n", RxBuffer);
+		}
+
+		if (RxBuffer[0] == 'O' && RxBuffer[1] == 'K' && RxBuffer[2] == '+')
+		{
+			successful=true;
+			printf("LPC\n");
+		}
+
+		// Clear RxBuffer
+		for (int i = 0; i != sizeof(RxBuffer); ++i)
+		{
+			RxBuffer[i] = 0;
+		}
+		return successful;
+}
+
 
 /*
 unsigned char * rx(int timeout, unsigned char *rxString)

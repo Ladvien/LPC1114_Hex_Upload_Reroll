@@ -57,14 +57,14 @@ void writeHexDataTofile(unsigned char fileData_Hex_String[], int hexDataCharCoun
 // FTDI
 static FILE *open_file ( char *file, char *mode );
 int fileSizer();
-unsigned char rx(bool printOrNot);
+unsigned char rx(bool parse, bool printOrNot);
 unsigned char parserx();
-char txString(char string[], int txString_size, bool printOrNot);
+char txString(char string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
 int FTDI_State_Machine(int state, int FT_Attempts);
-unsigned char get_LPC_Info();
+unsigned char get_LPC_Info(bool print);
 
 // LPC handling
-unsigned char set_ISP_mode();
+unsigned char set_ISP_mode(int print);
 
 // Data Handling
 struct hexFile hexFileToCharArray();
@@ -81,6 +81,11 @@ void setTextGreen();
 void setColor(int ForgC, int BackC);
 void clearConsole();
 void copy_string(char *target, char *source);
+void startScreen();
+void OK();
+void Failed();
+void check_HM_10();
+void wake_devices();
 
 //////////////////// Variables and Defines ////////////////////////////////////////////////////////
 
@@ -127,7 +132,8 @@ void copy_string(char *target, char *source);
 
 #define PRINT 1
 #define NO_PRINT 0
-
+#define PARSE 1
+#define NO_PARSE 0
 
 
 #define BLACK			0
@@ -219,8 +225,10 @@ int fullAddress = 0;
 int main(int argc, char *argv[])
 {
 
+
 	clearConsole();
 	
+	startScreen();	
 	// Stores hexFile data.
 	struct hexFile hexFile;
 
@@ -274,55 +282,45 @@ int main(int argc, char *argv[])
 	writeUUEDataTofile(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index);
 	
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
-	txString("Wake", sizeof("Wake"), NO_PRINT);
-	Sleep(500);
-	rx(NO_PRINT);
+
 	
-	// Attempt to turn the LPC echo off.
-	//txString("A 0", sizeof("A 0"), NO_PRINT);
-	//Sleep(500);
-	//successful += rx(PRINT);
+	wake_devices();
+	
+	check_HM_10();
 
 	clearConsole();
 	
 	// Set LPC into ISP mode.
-	set_ISP_mode();
+	set_ISP_mode(NO_PRINT);
+
 	// Get LPC Device info.
-	get_LPC_Info();
+	//get_LPC_Info(PRINT);
 
-	/*
 	//Sleep(500);
-	//txString(HM_RESET, sizeof(HM_RESET));
+	//txString(HM_RESET, sizeof(HM_RESET), PRINT, 0);
 	
-	// Set crystal
-	txString("12000\n", sizeof("12000\n"));
-	Sleep(500);
-	rx(NO000, rxString);
-
 	// Send Unlock Code
-	txString("U 23130\n", sizeof("U 23130\n"));
+	txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
 	Sleep(500);
-	rx(NO000, rxString);
+	rx(PARSE, PRINT);
 
 
 
 	// Read memory
-	txString("R 268436224 4\n", sizeof("R 268436224 4\n"));
+	txString("R 268436224 4\n", sizeof("R 268436224 4\n"), PRINT, 0);
 	Sleep(500);
-	rx(NO000, rxString);
-	txString("OK\n", sizeof("OK\n"));
+	rx(PARSE, PRINT);
+	txString("OK\n", sizeof("OK\n"), PRINT, 0);
 	Sleep(500);
-	rx(NO000, rxString);
+	rx(PARSE, PRINT);
 
-	
-
-
+/*
 		// Write memory
-		txString("W 268436224 8\n", sizeof("W 268436224 8\n"));
+		txString("W 268436224 8\n", sizeof("W 268436224 8\n"), 0);
 		Sleep(500);
 		rx(NO000, rxString);
 
-		txString("(5&AE(&-A<@\n403\n", sizeof("(5&AE(&-A<@\n403\n"));
+		txString("(5&AE(&-A<@\n403\n", sizeof("(5&AE(&-A<@\n403\n"), 0);
 		
 		// TEST
 		// HEX: 54 68 65 20 63 61 72
@@ -335,14 +333,14 @@ int main(int argc, char *argv[])
 		rx(NO000, rxString);
 
 	// Read memory
-	txString("R 268436224 4\n", sizeof("R 268436224 4\n"));
+	txString("R 268436224 4\n", sizeof("R 268436224 4\n"), 0);
 	Sleep(500);
 	rx(NO000, rxString);
-	txString("OK\n", sizeof("OK\n"));
+	txString("OK\n", sizeof("OK\n"), 0);
 	Sleep(500);
 	rx(NO000, rxString);
 
-	//txString("#0V%T\n", sizeof("#0V%T\n"));
+	//txString("#0V%T\n", sizeof("#0V%T\n"), 0);
 	//Sleep(500);
 	//rx(NO000, rxString);
 	*/
@@ -359,47 +357,60 @@ int main(int argc, char *argv[])
 ///////////// LPC Handling ///////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-unsigned char set_ISP_mode()
+unsigned char set_ISP_mode(int print)
 {
 	unsigned char rxString[256];
 
 	int successful = 0;
 
+	printf("Starting LPC ISP.");
 	for (int i = 0; i < 3; ++i)
 	{	
-		txString(HM_ISP_LOW, sizeof(HM_ISP_LOW), NO_PRINT);
+		txString(HM_ISP_LOW, sizeof(HM_ISP_LOW), print, 0);
 		Sleep(500);
-		successful += rx(NO_PRINT);
+		successful += rx(PARSE, print);
+		printf(".");
 
-		txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), NO_PRINT);
+		txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
 		Sleep(500);
-		successful += rx(NO_PRINT);
-
-		txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), NO_PRINT);
+		successful += rx(PARSE, print);
+		printf(".");
+		
+		txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
 		Sleep(500);
-		successful += rx(NO_PRINT);
+		successful += rx(PARSE, print);
+		printf(".");
 
-		txString(HM_ISP_HIGH, sizeof(HM_ISP_HIGH), NO_PRINT);
+		txString(HM_ISP_HIGH, sizeof(HM_ISP_HIGH), print, 0);
 		Sleep(500);
-		successful += rx(NO_PRINT);
-
+		successful += rx(PARSE, print);
+		printf(".");
+		
 		// Synchronized check.
-		txString(LPC_CHECK, sizeof(LPC_CHECK), NO_PRINT);
+		txString(LPC_CHECK, sizeof(LPC_CHECK), print, 0);
 		Sleep(500);
-		successful += rx(NO_PRINT);
+		successful += rx(PARSE, print);
+		printf(".");
 
 		// Tell the LPC we are synchronized.
-		txString(Synchronized, sizeof(Synchronized), NO_PRINT);
+		txString(Synchronized, sizeof(Synchronized), print, 0);
 		Sleep(500);
-		successful += rx(NO_PRINT);
+		successful += rx(PARSE, print);
+		printf(".");
 
 		// Set crystal
-		txString("12000\n", sizeof("12000\n"), NO_PRINT);
+		txString("12000\n", sizeof("12000\n"), print, 0);
 		Sleep(500);
-		successful += rx(NO_PRINT);
+		successful += rx(PARSE, print);
+		printf(".");
+
+		txString("A 0\n", sizeof("A 0\n"), print, 10);
+		Sleep(500);
+		rx(PARSE, print);		
+		printf(".");
 
 		// Set baud
-		//txString("9600\n", sizeof("9600\n"));
+		//txString("9600\n", sizeof("9600\n"), 0);
 		//Sleep(500);
 		//setTextGreen();
 		//printf("%s\n", ParsedRxBuffer);
@@ -409,14 +420,14 @@ unsigned char set_ISP_mode()
 		// 
 		if (successful > 6)
 		{
-			printf("LPC successfuly entered ISP mode.\n");
+			OK();
 			return 1;	
 		}
 		else
 		{
-			printf("%i\n", successful);
+			Failed();
 			successful = 0;
-			printf("Failed to set ISP. Retrying...\n");
+			printf("Retrying.\n");
 			clearBuffers();
 			Sleep(500);
 		}
@@ -424,8 +435,73 @@ unsigned char set_ISP_mode()
 	return 0;
 }
 
+void wake_devices()
+{
+	txString("Wake", sizeof("Wake"), NO_PRINT, 10);
+	Sleep(500);
+	rx(NO_PARSE, PRINT);
+	printf("Waking Devices...\n");
+}
 
-unsigned char get_LPC_Info()
+void check_HM_10()
+{
+	unsigned char char_RSSI[2];
+	int int_RSSI;
+
+	txString("AT+RSSI?", sizeof("AT+RSSI?"), NO_PRINT, 0);
+	Sleep(500);
+
+	FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
+
+	if (RxBytes > 0) {
+		FT_status = FT_Read(handle,RawRxBuffer,RxBytes,&BytesReceived);
+	}
+	else
+	{
+		// Bad RSSI read.
+	}		
+	
+	if(sizeof(RawRxBuffer) < 10)
+	{
+		char_RSSI[0] = 0;
+		char_RSSI[1] = RawRxBuffer[8];
+		char_RSSI[2] = RawRxBuffer[8];	
+	}
+	else if (sizeof(RawRxBuffer) > 10)
+	{
+		char_RSSI[0] = RawRxBuffer[8];
+		char_RSSI[1] = RawRxBuffer[9];
+		char_RSSI[2] = RawRxBuffer[10];	
+	}
+	
+	//int_RSSI = atoi(char_RSSI);
+	sscanf(char_RSSI, "%D", &int_RSSI);
+
+	if (int_RSSI > 30 && int_RSSI < 60)
+	{
+		clearConsole();
+		printf("HM-10 signal: ");
+		setTextGreen();
+		printf("Strong\n");		
+	}
+	else if (int_RSSI > 60 && int_RSSI < 90)
+	{
+		clearConsole();
+		printf("HM-10 signal: ");
+		printf("Medium\n");	
+	}
+	else if (int_RSSI > 90 && int_RSSI < 120)
+	{
+		clearConsole();
+		printf("HM-10 signal: ");
+		setTextRed();
+		printf("Weak\n");		
+	}
+	clearConsole();
+}
+
+
+unsigned char get_LPC_Info(bool print)
 {
 	int successful = 0;
 	unsigned char PartID[256];
@@ -435,21 +511,21 @@ unsigned char get_LPC_Info()
 	for (int i = 0; i < 3; ++i)
 	{	
 		// Read Part ID
-		txString("N\n", sizeof("N\n"), NO_PRINT);
+		txString("N\n", sizeof("N\n"), print, 0);
 		Sleep(500);
-		successful += rx(NO_PRINT);
+		successful += rx(PARSE, print);
 		copy_string(PartID, ParsedRxBuffer);
 		
 		// Read UID
-		txString("J\n", sizeof("J\n"), NO_PRINT);
+		txString("J\n", sizeof("J\n"), print, 0);
 		Sleep(500);
-		successful += rx(NO_PRINT);
+		successful += rx(PARSE, print);
 		copy_string(UID, ParsedRxBuffer);
 
 		// Boot Version
-		txString("K\n", sizeof("K\n"), NO_PRINT);
+		txString("K\n", sizeof("K\n"), print, 0);
 		Sleep(500);
-		successful += rx(NO_PRINT);
+		successful += rx(PARSE, print);
 		copy_string(BootVersion, ParsedRxBuffer);
 		
 
@@ -457,10 +533,10 @@ unsigned char get_LPC_Info()
 
 		if (successful > 2)
 		{
-			printf("Device info successfully read: \n");
+			printf("Device info successfully read: \n\n");
 			printf("Boot Version: %s\n", BootVersion);
-			printf("UID: %s\n", UID);
-			printf("Part Number: %s\n", PartID);
+			printf("UID:          %s\n", UID);
+			printf("Part Number:  %s\n", PartID);
 			break;	
 		}
 		else
@@ -472,6 +548,19 @@ unsigned char get_LPC_Info()
 		}
 	}
 
+}
+
+void OK()
+{
+	setTextGreen();
+	printf("OK.\n\n");
+	clearConsole();
+}
+void Failed()
+{
+	setTextRed();
+	printf("FAILED.\n\n");
+	clearConsole();	
 }
 
 void copy_string(char *target, char *source)
@@ -567,7 +656,7 @@ int fileSizer()
 }
 
 
-unsigned char rx(bool printOrNot)
+unsigned char rx(bool parse, bool printOrNot)
 {	
 	// 0 = unsuccessful, 1 = LPC, 2 = HM-10
 	int device_and_success = 0;
@@ -581,15 +670,26 @@ unsigned char rx(bool printOrNot)
 		FT_status = FT_Read(handle,RawRxBuffer,RxBytes,&BytesReceived);
 		if (FT_status == FT_OK) {
 
-			
-			device_and_success = parserx();
+			if(parse)
+			{
+				device_and_success = parserx();
+			}
+			else
+			{
+				strcpy(ParsedRxBuffer, RawRxBuffer);
+				device_and_success = 1;
+			}
+
 			clearConsole();
+			
 			if(printOrNot)
 			{
 				setTextGreen();
 				printf("%s\n", ParsedRxBuffer);
 				clearConsole();
+				clearBuffers();
 			}
+	
 			if(device_and_success > 0){return 1;}
 
 		}
@@ -632,8 +732,9 @@ unsigned char parserx()
 			{
 				if(ParsedRxBuffer[replaceIndex] == '\r' && ParsedRxBuffer[replaceIndex+1] == '\n')
 				{
-					ParsedRxBuffer[replaceIndex] = '0';
-					ParsedRxBuffer[replaceIndex+1] = '0';
+					// REWRITE TO SHORTEN STRING, INSTEAD OF '0'
+					ParsedRxBuffer[replaceIndex] = ' ';
+					ParsedRxBuffer[replaceIndex+1] = ' ';
 				}								
 				replaceIndex++;
 			}
@@ -647,9 +748,9 @@ unsigned char parserx()
 			{
 				// Here, we are shortening the string due to echo.
 				// "N/n0/r/n" = 5 characters.
-				while(replaceIndex < sizeof(ParsedRxBuffer)+5)
+				while(replaceIndex < sizeof(ParsedRxBuffer))
 				{
-					ParsedRxBuffer[replaceIndex] = ParsedRxBuffer[replaceIndex+5];
+					ParsedRxBuffer[replaceIndex] = ParsedRxBuffer[replaceIndex+6];
 					replaceIndex++;
 				}
 				// Let's say this was a successful parsing.
@@ -663,7 +764,17 @@ unsigned char parserx()
 				successful = 1;
 			}
 			successful = 1;
-				
+			
+			if (ParsedRxBuffer[0] == 0)
+			{
+				while(replaceIndex < sizeof(ParsedRxBuffer))
+				{
+					ParsedRxBuffer[replaceIndex] = ParsedRxBuffer[replaceIndex+1];
+					replaceIndex++;
+				}
+				printf("CMD_SUCCEDED");
+			}
+
 		}
 		// Is it an HM-10?
 		else if (RawRxBuffer[0] == 'O' && RawRxBuffer[1] == 'K' && RawRxBuffer[2] == '+')
@@ -702,13 +813,15 @@ void clearBuffers()
 	}
 }
 
-char txString(char string[], int txString_size, bool printOrNot)
+
+char txString(char string[], int txString_size, bool printOrNot, int frequency_of_tx_char)
 {
 	unsigned char FTWrite_Check;
 	
 	for (int i = 0; i < (txString_size-1); i++){
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
 		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), &bytes);
+		Sleep(frequency_of_tx_char);
 	}	
 
 	// Let's check if the send string contains a newline character.
@@ -725,9 +838,6 @@ char txString(char string[], int txString_size, bool printOrNot)
 			printf("%s", string);	
 		}	
 	}
-	
-	
-	
 }
 
 ///////////// Debugging //////////////////////////////////////////////////////////////////////
@@ -1046,4 +1156,20 @@ void setColor(int ForgC, int BackC)
 void clearConsole()
 {
 	setColor(WHITE, BLACK);
+}
+
+void startScreen()
+{
+	printf("\n");
+	printf("\n");
+	printf("**************************************************************************\n");
+	printf("**** Mutant LPC1114 Downloader v.1                                   *****\n");
+	printf("**** Hacked Out with Little Thought                                  *****\n");
+	printf("****                                   Thanks to Bdk6                *****\n");
+	printf("****                            His help was more than invaluable,   *****\n");
+	printf("****                                 it was a necessity.             *****\n");
+	printf("**************************************************************************\n");
+	printf("\n");
+	printf("\n");
+	clearConsole();
 }

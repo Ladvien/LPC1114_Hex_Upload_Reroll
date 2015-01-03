@@ -304,8 +304,19 @@ int main(int argc, char *argv[])
 	Sleep(500);
 	rx(PARSE, PRINT);
 
+	// Write memory
+	txString("W 268435456 4\n", sizeof("W 268435456 4\n"), PRINT, 0);
+	Sleep(500);
+	rx(PARSE, PRINT);
 
+	txString("$%`^H%P``\n", sizeof("$%`^H%P``\n"), PRINT, 0);
+	rx(NO_PARSE, PRINT);
+	txString("226\n", sizeof("226\n"), PRINT, 0);
+	Sleep(120);
+	rx(NO_PARSE, PRINT);
 
+	
+	/*
 	// Read memory
 	txString("R 268436224 4\n", sizeof("R 268436224 4\n"), PRINT, 0);
 	Sleep(500);
@@ -314,7 +325,7 @@ int main(int argc, char *argv[])
 	Sleep(500);
 	rx(PARSE, PRINT);
 
-/*
+
 		// Write memory
 		txString("W 268436224 8\n", sizeof("W 268436224 8\n"), 0);
 		Sleep(500);
@@ -427,7 +438,7 @@ unsigned char set_ISP_mode(int print)
 		{
 			Failed();
 			successful = 0;
-			printf("Retrying.\n");
+			printf("Retrying.");
 			clearBuffers();
 			Sleep(500);
 		}
@@ -467,7 +478,7 @@ void check_HM_10()
 		char_RSSI[1] = RawRxBuffer[8];
 		char_RSSI[2] = RawRxBuffer[8];	
 	}
-	else if (sizeof(RawRxBuffer) > 10)
+	else if (sizeof(RawRxBuffer) > 9)
 	{
 		char_RSSI[0] = RawRxBuffer[8];
 		char_RSSI[1] = RawRxBuffer[9];

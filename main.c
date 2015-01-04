@@ -283,6 +283,7 @@ int main(int argc, char *argv[])
 	
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 
+	printf("%s\n", UUE_Data.UUE_Encoded_String);
 	
 	wake_devices();
 	
@@ -1104,6 +1105,7 @@ struct UUE_Data UUencode()
 	struct UUE_Data UUE_Data;
 	//unsigned char fileData_Hex_String[], int hexDataCharCount
 
+
 	for(int hexDataIndex = 0;  hexDataIndex < hexFile.fileData_Hex_String_Size; hexDataIndex)
 	{
 		// Load chars or nulls
@@ -1128,6 +1130,22 @@ struct UUE_Data UUencode()
 		UUE_Data.d[2] = ((((UUE_Data.b[1] << 2) | ((UUE_Data.b[2] >> 6) & 0x03)) & 0x3f) + ' ');
 		UUE_Data.d[3] = ((UUE_Data.b[2] & 0x3f) + ' ');
 		
+
+
+		if (UUE_Data.b[0] == 0x00)
+		{
+			UUE_Data.b[0] = 0x60;
+		}	
+		if (UUE_Data.b[1] == 0x00)
+		{
+			UUE_Data.b[1] = 0x60;
+		}	
+		if (UUE_Data.b[2] == 0x00)
+		{
+			UUE_Data.b[2] = 0x60;
+		}	
+
+		
 		// Put the UUEncoded chars into their own string.
 		for (int i = 0; i < 4; i++)
 		{
@@ -1135,7 +1153,7 @@ struct UUE_Data UUencode()
 			UUE_Data.UUE_Encoded_String_Index++;
 		}
 	}
-	
+
 	// ADD FOR-LOOP TO DIVIDE UUE DATA INTO 61 CHAR STRINGS.
 
 	/*

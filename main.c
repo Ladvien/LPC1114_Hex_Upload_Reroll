@@ -272,32 +272,55 @@ int main(int argc, char *argv[])
 	writeUUEDataTofile(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index);
 	
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
-	//wake_devices();
+	wake_devices();
 	
 	// Check the RSSI of HM-10.
-	//check_HM_10();
+	check_HM_10();
 
 	// Clear the console color.
-	//clearConsole();
+	clearConsole();
 	
 	// Set LPC into ISP mode.
-	//set_ISP_mode(NO_PRINT);
+	set_ISP_mode(NO_PRINT);
 
 	// Get LPC Device info.
-	//get_LPC_Info(NO_PRINT);
+	get_LPC_Info(NO_PRINT);
 
 	//Sleep(500);
 	//txString(HM_RESET, sizeof(HM_RESET), PRINT, 0);
 	
 	// Send Unlock Code
-	//txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
-	//Sleep(500);
-	//rx(PARSE, NO_PRINT);
+	txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
+	Sleep(500);
+	rx(PARSE, NO_PRINT);
 
+	// DEBUG NOTES:
+	// It seems the hexFile.original_data_checksum printed from the hexRead function
+	// does not equal what it does from the main function.
+
+	// Turn UUE string size into ASCII.
+	char tx_byte_count[64];
+	sprintf(tx_byte_count, "%i", UUE_Data.UUE_Encoded_String_Index);
+	// Turn hex data checksum into ASCII.
+	char tx_check_sum[64];
+	sprintf(tx_check_sum, "%i", (hexFile.original_data_checksum+1));
+	printf("%i\n", hexFile.original_data_checksum);
+	printf("%s\n", tx_check_sum);
+	
 	// Write memory
-	//txString("W 268435456 4\n", sizeof("W 268435456 4\n"), PRINT, 0);
-	//Sleep(500);
-	//rx(PARSE, PRINT);
+	txString("W", sizeof("W"), PRINT, 0);
+	txString("268435456", sizeof("268435456"), PRINT, 0);  // Write address
+	txString(tx_byte_count, sizeof(tx_byte_count), PRINT, 0); // How many bytes.
+	txString("\n", sizeof("\n"), PRINT, 0);					// Send write command.
+	rx(PARSE, PRINT);
+	Sleep(100);
+	txString(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index, PRINT, 0); // Send UUE data
+	txString("\n", sizeof("\n"), PRINT, 0); // End UUE data
+	txString(tx_check_sum, sizeof(tx_check_sum), PRINT, 0); // Send hex data checksum.
+	txString("\n", sizeof("\n"), PRINT, 0); // End checksum.
+
+	Sleep(500);
+	rx(PARSE, PRINT);
 
 	//txString(hexFile.fileData_Hex_String, hexFile.fileData_Hex_String_Size, PRINT, 0);
 	//rx(NO_PARSE, PRINT);
@@ -1074,7 +1097,7 @@ struct hexFile hexFileToCharArray(int fileSize)
 		hexFile.hexFileLineCount++;
 		i++;
 	}
-		
+	printf("%i\n", hexFile.original_data_checksum);
 	return hexFile;
 }
 

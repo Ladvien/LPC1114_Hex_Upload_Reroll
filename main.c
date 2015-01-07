@@ -303,12 +303,13 @@ int main(int argc, char *argv[])
 	sprintf(tx_byte_count, "%i", UUE_Data.UUE_Encoded_String_Index);
 	// Turn hex data checksum into ASCII.
 	char tx_check_sum[64];
-	sprintf(tx_check_sum, "%i", (hexFile.original_data_checksum+1));
+	sprintf(tx_check_sum, "%i", (hexFile.original_data_checksum));
 	printf("%i\n", hexFile.original_data_checksum);
 	printf("%s\n", tx_check_sum);
 	
 	// Write memory
-	txString("W", sizeof("W"), PRINT, 0);
+	txString("W", sizeof("W"), PRINT, 0);+
+
 	txString("268435456", sizeof("268435456"), PRINT, 0);  // Write address
 	txString(tx_byte_count, sizeof(tx_byte_count), PRINT, 0); // How many bytes.
 	txString("\n", sizeof("\n"), PRINT, 0);					// Send write command.
@@ -1202,6 +1203,11 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 	// Let's set the UUE String Index (count) compsenating for null pads.
 	UUE_Data.UUE_Encoded_String_Index = UUE_Data.UUE_Encoded_String_Index - UUE_Data.paddedIndex;
 
+	// Let's make sure the string is divisible by 4.
+	if(!(UUE_Data.UUE_Encoded_String_Index % 4 == 0))
+	{
+		UUE_Data.UUE_Encoded_String_Index++;
+	}
 	//for (int i = 0; i < UUE_Data.UUE_Encoded_String_Index; i)
 	//{	
 	//	printf("%C", UUE_Data.UUE_Encoded_String[i]);
@@ -1266,63 +1272,79 @@ void command_response()
 	// set in parseRx().
 	switch(command_response_code)
 	{
+		// 1
 		case RESP_CMD_SUCCESS:
 			printf("Command Success");
 			break;
+		// 2
 		case RESP_INVALID_COMMAND:
 			printf("Invalid Command");
 			break;
+		// 3
 		case RESP_SRC_ADDR_ERROR:
 			printf("Source Address Error");
 			break;
-		case RESP_DST_ADDR_ERROR:
-			printf("Destination Address Error");
-			break;
+		// 4
 		case RESP_SRC_ADDR_NOT_MAPPED:
 			printf("Source Address Not Mapped");
 			break;
+		// 5
 		case RESP_DST_ADDR_NOT_MAPPED:
 			printf("Destination Address Not Mapped");
 			break;
+		// 6
 		case RESP_COUNT_ERROR:
 			printf("Count Error");
 			break;
+		// 7
 		case RESP_INVALID_SECTOR:
 			printf("Invalid Sector");
 			break;
+		// 8
 		case RESP_SECTOR_NOT_BLANK:
 			printf("Sector Not Blank");
 			break;
+		// 9
 		case RESP_SECTOR_NOT_PREPARED_FOR_WRITE_OPERATION:
 			printf("Sector Not Prepared for Write Operation");
 			break;
+		// 10
 		case RESP_COMPARE_ERROR:
 			printf("Compare Error");
 			break;
+		// 11
 		case RESP_BUSY:
 			printf("Busy");
 			break;
+		// 12
 		case RESP_PARAM_ERROR:
 			printf("Parameter Error");
 			break;
+		// 13
 		case RESP_ADDR_ERROR:
 			printf("Address Error");
 			break;
+		// 14
 		case RESP_ADDR_NOT_MAPPED:
 			printf("Address Not Mapped");
 			break;
+		// 15
 		case RESP_CMD_LOCKED:
 			printf("Command Locked");
 			break;
+		// 16
 		case RESP_INVALID_CODE:
 			printf("Invalid Code");
 			break;
+		// 17
 		case RESP_INVALID_BAUD_RATE:
 			printf("Invalid Baud Rate");
 			break;
+		// 18
 		case RESP_INVALID_STOP_BIT:
 			printf("Invalid Stop Bit");
 			break;
+		// 19
 		case RESP_CODE_READ_PROTECTION_ENABLED:
 			printf("Code Read Protection Enabled");
 			break;			

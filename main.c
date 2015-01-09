@@ -1123,6 +1123,12 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 
 	// Stores UUE data.
 	struct UUE_Data UUE_Data;
+
+	for (int i = 0; i < 20; ++i)
+	{
+		printf("%02X ", hexFile.fileData_Hex_String[i]);
+	}
+	
 	
 	// Set up characters per line index.
 	UUE_Data.uue_length_char_index = 45;

@@ -55,7 +55,7 @@ void Failed();
 void check_HM_10();
 void wake_devices();
 
-struct writeToRam write_to_ram();
+struct writeToRam write_to_ram(int varSize);
 
 //////////////////// Variables and Defines ////////////////////////////////////////////////////////
 
@@ -259,11 +259,12 @@ int main(int argc, char *argv[])
 	// Sizes file to be used in data handling.
 	fileSize = fileSizer();
 
+	//write_to_ram(5);
 	//Convert file to one long char array.
 	hexFile = hexFileToCharArray(fileSize);
 
 	// Write hex string back to a file.  Used for debugging.
-	writeHexDataTofile(hexFile.fileData_Hex_String, hexFile.fileData_Hex_String_Size, hexFile.fhexByteCount, hexFile.hexFileLineCount);
+	//writeHexDataTofile(hexFile.fileData_Hex_String, hexFile.fileData_Hex_String_Size, hexFile.fhexByteCount, hexFile.hexFileLineCount);
 	
 	// Convert hex data to UUE.
 	UUE_Data = UUencode(hexFile);
@@ -271,6 +272,8 @@ int main(int argc, char *argv[])
 	// Write the UUE string to a file.  CURRENTLY BROKEN-ish.
 	writeUUEDataTofile(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index);
 	
+	
+
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	wake_devices();
 	
@@ -281,7 +284,7 @@ int main(int argc, char *argv[])
 	clearConsole();
 	
 	// Set LPC into ISP mode.
-	set_ISP_mode(PRINT);
+	set_ISP_mode(NO_PRINT);
 
 	// Get LPC Device info.
 	//get_LPC_Info(PRINT);
@@ -298,17 +301,22 @@ int main(int argc, char *argv[])
 	// It seems the hexFile.original_data_checksum printed from the hexRead function
 	// does not equal what it does from the main function.
 	char write_to_ram_string[64];
+	
 	// Turn UUE string size into ASCII.
-	int tx_byte_count[64];
-	tx_byte_count[0] = UUE_Data.UUE_Encoded_String_Index;
+	char tx_byte_count[64];
+	
+	//itoa(UUE_Data.UUE_Encoded_String_Index, tx_byte_count);
+	sprintf(tx_byte_count, "%i", hexFile.fileData_Hex_String_Size);
+
 	// Turn hex data checksum into ASCII.
 	char tx_check_sum[64];
 	sprintf(tx_check_sum, "%i", (hexFile.original_data_checksum[0]));
-	//printf("%i\n", hexFile.original_data_checksum);
-	//printf("%s\n", tx_check_sum);
-	printf("BYTE COUNT: %i\n", tx_byte_count[0]);
+	
+	printf("orig-d-check %i\n", hexFile.original_data_checksum);
+	printf("tx_check_sum %s\n", tx_check_sum);
+	printf("BYTE COUNT: %c\n", tx_byte_count[0]);
 
-	sprintf(write_to_ram_string, "W 268436224 %i\n", tx_byte_count[0]);
+	sprintf(write_to_ram_string, "W 268436224 %c\n", tx_byte_count[0]);
 	// Write memory
 	txString(write_to_ram_string, sizeof(write_to_ram_string), PRINT, 5);
 	Sleep(300);
@@ -328,7 +336,7 @@ int main(int argc, char *argv[])
 	//Sleep(120);
 	//rx(NO_PARSE, PRINT);
 
-	//write_to_ram();
+	
 	
 
 
@@ -385,17 +393,26 @@ int main(int argc, char *argv[])
 
 
 
-struct writeToRam write_to_ram()
+struct writeToRam write_to_ram(int varSize)
 {
+	char blah[varSize];
 	// Stores hexFile data.
 	struct hexFile hexFile;
 
 	// Stores UUE data.
 	struct UUE_Data UUE_Data;
 
+	blah[0] = 'A';
+	blah[1] = 'S';
+	blah[2] = 'S';
+	blah[3] = '\0';
+	blah[4] = '0';
+
 	for (int i = 0; i < 1200; ++i)
 	{
-		printf("%02X ", UUE_Data.UUE_Encoded_String[i]);
+		//blah[i] = 'D';
+		printf("%s ", blah);
+		Sleep(500);
 	}
 	
 
@@ -1053,13 +1070,14 @@ struct hexFile hexFileToCharArray(int fileSize)
 		// We only want data.
 		if (hexFile.fhexRecordType[i] == 0)
 		{
-			while (hexDataIndex != charsThisLine && totalCharsRead  < fileSize && charsThisLine != 0x00)
+			// We take one away to account for 'zero index.'
+			while (hexDataIndex < (charsThisLine-1) && totalCharsRead < fileSize && charsThisLine != 0x00)
 			{
 				//Store the completed hex value in the char array.
 				hexFile.fileData_Hex_String[hexFile.fileData_Hex_String_Size] = readByte();
-				
-
+		
 				hexFile.original_data_checksum[check_sum_index] += hexFile.fileData_Hex_String[hexFile.fileData_Hex_String_Size];
+
 				if(check_sum_count_45 > 900)
 				{
 					check_sum_index++;
@@ -1069,15 +1087,17 @@ struct hexFile hexFileToCharArray(int fileSize)
 				
 				//Index for data.
 				hexFile.fileData_Hex_String_Size++;
-				//Index for loop.
 				
+				//Index for loop.
 				check_sum_count_45++;
 
 				hexDataIndex++;
 			}
-		//Reset loop index.
+
+		//Reset loop index for characters on this line.
 		hexDataIndex=0;
 		}
+		
 
 		
 		//////// CHECK SUM //////////////
@@ -1088,7 +1108,8 @@ struct hexFile hexFileToCharArray(int fileSize)
 		hexFile.hexFileLineCount++;
 		i++;
 	}
-	//printf("%i\n", hexFile.original_data_checksum);
+	
+	printf("Hex Data Index %i\n", hexFile.fileData_Hex_String_Size);
 	return hexFile;
 }
 
@@ -1105,7 +1126,7 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 	
 	// Set up characters per line index.
 	UUE_Data.uue_length_char_index = 45;
-	
+	UUE_Data.UUE_Encoded_String_Index = 0;
 	// Let's add the first char representing the lines per character
 	// M = 45, $ = 4, etc.
 	if (hexFile.fileData_Hex_String_Size < 45)
@@ -1138,6 +1159,7 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 			}
 			hexDataIndex++;
 			UUE_Data.uue_length_char_index--;
+
 		}
 		
 		// UUEncode
@@ -1148,13 +1170,11 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 		
 		// Replace 6-bit groups == 0x00
 		// with 0x60.  Required by LPC.	
-
 		// Put the UUEncoded chars into their own string.
 		for (int i = 0; i < 4; i++)
 		{
 			if (UUE_Data.d[i] == 0x00)
 			{
-				printf("SPACE\n");
 				UUE_Data.UUE_Encoded_String[UUE_Data.UUE_Encoded_String_Index] == 0x60;
 			}
 			else
@@ -1163,7 +1183,6 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 				UUE_Data.UUE_Encoded_String_Index++;
 			}
 			
-			printf("%i\n", UUE_Data.UUE_Encoded_String_Index);
 		}
 		
 		// Lets add data bytes per line character.
@@ -1187,7 +1206,7 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 			}
 		}
 	}
-
+	
 	// Let's set the UUE String Index (count) compsenating for null pads.
 	UUE_Data.UUE_Encoded_String_Index = UUE_Data.UUE_Encoded_String_Index - UUE_Data.paddedIndex;
 
@@ -1195,7 +1214,7 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 	if(!(UUE_Data.UUE_Encoded_String_Index % 4 == 0))
 	{
 		UUE_Data.UUE_Encoded_String_Index++;
-		UUE_Data.UUE_Encoded_String[UUE_Data.UUE_Encoded_String_Index] = 0x00;
+		//UUE_Data.UUE_Encoded_String[UUE_Data.UUE_Encoded_String_Index] = 0x00;
 	}
 	//for (int i = 0; i < UUE_Data.UUE_Encoded_String_Index; i)
 	//{	

@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
 	clearConsole();
 	
 	// Set LPC into ISP mode.
-	set_ISP_mode(NO_PRINT);
+	//set_ISP_mode(NO_PRINT);
 
 	// Get LPC Device info.
 	//get_LPC_Info(PRINT);
@@ -970,7 +970,7 @@ static unsigned char Ascii2Hex(unsigned char c)
 	{
         return (unsigned char)(c - 'A' + 10);
 	}
-	//printf("\n !!! Bad Character: 0x%2x in file at totalCharsRead=%d !!!\n\n", c, totalCharsRead);
+	printf("\n !!! Bad Character: %02X in file at totalCharsRead=%d !!!\n\n", c, totalCharsRead);
 	return 0;  // this "return" will never be reached, but some compilers give a warning if it is not present
 } 
 
@@ -1024,6 +1024,33 @@ int readByte(){
 	return hexValue;
 }
 
+/*
+int readByte(){
+	//Holds combined nibbles.
+	unsigned char ASCII_hexvalue[3];
+	unsigned char hex_hexvalue;
+	char * pEnd;
+
+	//Put first nibble in.
+	charToPut = fgetc (fileIn);
+	clearSpecChar();
+	ASCII_hexvalue[0] = (unsigned char)charToPut;
+	
+	//Put second nibble in.
+	charToPut = fgetc (fileIn);
+	clearSpecChar();
+	ASCII_hexvalue[1] = (unsigned char)charToPut;
+
+	// Increase counter for total characters read from file.
+	totalCharsRead+=2;
+
+	// Convert the hex string to base 16.
+	hex_hexvalue = strtol(ASCII_hexvalue, &pEnd, 16);
+	
+	return hex_hexvalue;	
+}
+*/
+
 
 //Convert file to one long char array.
 struct hexFile hexFileToCharArray(int fileSize)
@@ -1071,11 +1098,11 @@ struct hexFile hexFileToCharArray(int fileSize)
 		if (hexFile.fhexRecordType[i] == 0)
 		{
 			// We take one away to account for 'zero index.'
-			while (hexDataIndex < (charsThisLine-1) && totalCharsRead < fileSize && charsThisLine != 0x00)
+			while (hexDataIndex < charsThisLine && totalCharsRead < fileSize && charsThisLine != 0x00)
 			{
 				//Store the completed hex value in the char array.
 				hexFile.fileData_Hex_String[hexFile.fileData_Hex_String_Size] = readByte();
-		
+
 				hexFile.original_data_checksum[check_sum_index] += hexFile.fileData_Hex_String[hexFile.fileData_Hex_String_Size];
 
 				if(check_sum_count_45 > 900)
@@ -1108,8 +1135,14 @@ struct hexFile hexFileToCharArray(int fileSize)
 		hexFile.hexFileLineCount++;
 		i++;
 	}
+
+
+	for (int i = 0; i < 20; ++i)
+	{
+		printf("%02X ", hexFile.fileData_Hex_String[i]);
+	}
 	
-	printf("Hex Data Index %i\n", hexFile.fileData_Hex_String_Size);
+	
 	return hexFile;
 }
 
@@ -1126,9 +1159,10 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 
 	for (int i = 0; i < 20; ++i)
 	{
-		printf("%02X ", hexFile.fileData_Hex_String[i]);
+		//printf("%02X ", hexFile.fileData_Hex_String[i]);
 	}
 	
+	//printf("\n");
 	
 	// Set up characters per line index.
 	UUE_Data.uue_length_char_index = 45;
@@ -1138,12 +1172,12 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 	if (hexFile.fileData_Hex_String_Size < 45)
 	{
 		hexFile.fileData_Hex_String_Size = hexFile.fileData_Hex_String_Size + ' ';
-		printf("HERE 1\n");
+		//printf("HERE 1\n");
 	}
 	else
 	{
 		UUE_Data.UUE_Encoded_String[UUE_Data.UUE_Encoded_String_Index] = 'M';
-		printf("HERE 2\n");
+		//printf("HERE 2\n");
 	}
 	UUE_Data.UUE_Encoded_String_Index++;		
 
@@ -1158,20 +1192,20 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 			if (hexDataIndex < hexFile.fileData_Hex_String_Size)
 			{
 				UUE_Data.b[i] = hexFile.fileData_Hex_String[hexDataIndex];	
-				printf("HERE 4\n");
+				//printf("HERE 4\n");
 			}
 			else
 			{
 				// Padding with zeros.
 				UUE_Data.b[i] = 0;
 				UUE_Data.paddedIndex++;
-				printf("HERE 4.5\n");
+				//printf("HERE 4.5\n");
 			}
 			hexDataIndex++;
 			UUE_Data.uue_length_char_index--;
-			printf("HERE 5\n");
+			//printf("HERE 5\n");
 		}
-		printf("HERE 6\n");
+		//printf("HERE 6\n");
 		// UUEncode
 		UUE_Data.d[0] = ((UUE_Data.b[0] >> 2) & 0x3f);
 		UUE_Data.d[1] = (((UUE_Data.b[0] << 4) | ((UUE_Data.b[1] >> 4) & 0x0f)) & 0x3f);
@@ -1185,12 +1219,12 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 		{
 			if (UUE_Data.d[i] == 0x00)
 			{
-				printf("HERE 8\n");
+				//printf("HERE 8\n");
 				UUE_Data.UUE_Encoded_String[UUE_Data.UUE_Encoded_String_Index] == 0x60;
 			}
 			else
 			{
-				printf("HERE 9\n");
+				//printf("HERE 9\n");
 				UUE_Data.UUE_Encoded_String[UUE_Data.UUE_Encoded_String_Index] = (UUE_Data.d[i] + ' ');
 				
 			}
@@ -1200,11 +1234,11 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 		// Lets add data bytes per line character.
 		if (UUE_Data.uue_length_char_index == 0)
 		{
-			printf("HERE 10\n");
+			//printf("HERE 10\n");
 			// If the line is less than 45, let's calculate the char count.
 			if (((hexDataIndex*-1) + hexFile.fileData_Hex_String_Size) < 45)
 			{
-				printf("HERE 11\n");
+				//printf("HERE 11\n");
 				// Byte data index inverted plus the string size, converted to 6-bit ASCII.
 				// This should only be for the last line.
 				UUE_Data.UUE_Encoded_String[UUE_Data.UUE_Encoded_String_Index] = 
@@ -1213,7 +1247,7 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 			}
 			else
 			{
-				printf("HERE 12\n");
+				//printf("HERE 12\n");
 				// If it's a normal line (>45 bytes), add M, which is 6-bit ASCII for 45.
 				UUE_Data.UUE_Encoded_String[UUE_Data.UUE_Encoded_String_Index] = 'M';
 				UUE_Data.UUE_Encoded_String_Index++;	
@@ -1225,11 +1259,11 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 	// Let's set the UUE String Index (count) compsenating for null pads.
 	UUE_Data.UUE_Encoded_String_Index = UUE_Data.UUE_Encoded_String_Index - UUE_Data.paddedIndex;
 
-	printf("HERE 13\n");
+	//printf("HERE 13\n");
 	// Let's make sure the string is divisible by 4.
 	if(!(UUE_Data.UUE_Encoded_String_Index % 4 == 0))
 	{
-		printf("HERE 14\n");
+		//printf("HERE 14\n");
 		UUE_Data.UUE_Encoded_String_Index++;
 		//UUE_Data.UUE_Encoded_String[UUE_Data.UUE_Encoded_String_Index] = 0x00;
 	}
@@ -1238,7 +1272,7 @@ struct UUE_Data UUencode(struct hexFile hexFile)
 	//	printf("%C", UUE_Data.UUE_Encoded_String[i]);
 	//	i++;		
 	//}
-	printf("HERE 15\n");
+	//printf("HERE 15\n");
 	return UUE_Data;
 }
 

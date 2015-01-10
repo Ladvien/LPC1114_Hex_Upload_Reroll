@@ -35,8 +35,9 @@ void command_response();
 unsigned char set_ISP_mode(int print);
 
 // Data Handling
+void hex_file_to_string(unsigned char* result, int size, int file_size);
 struct hexFile hexFileToCharArray();
-int readByte();
+unsigned char readByte();
 void clearSpecChar();
 int Hex2Ascii(unsigned char hexValue);
 int Hex2Int(unsigned char c);
@@ -206,7 +207,7 @@ typedef enum {
 
 
 
-int fullAddress = 0;
+
 
 ///////////////////// PROGRAM ////////////////////////////
 ////////////////////// START /////////////////////////////
@@ -230,6 +231,8 @@ int main(int argc, char *argv[])
 	unsigned char DTR_Switch;
 	unsigned char CTS_Switch;
 
+	// Holds the raw hex data, straight from the file.
+	unsigned char hex_data_string[MAX_SIZE];
 	// Stores file size.
 	int fileSize = 0;
 
@@ -259,9 +262,24 @@ int main(int argc, char *argv[])
 	// Sizes file to be used in data handling.
 	fileSize = fileSizer();
 
-	//write_to_ram(5);
-	//Convert file to one long char array.
-	hexFile = hexFileToCharArray(fileSize);
+	// Get the hex data string from file.
+	unsigned char * buffer;
+	// Allocate the string memory.
+	buffer = malloc(MAX_SIZE);
+	if(buffer){
+		// Load the data from file
+		hex_file_to_string(buffer, MAX_SIZE, fileSize);
+		// Copy into a local string.
+
+		strncpy(hex_data_string, buffer, MAX_SIZE);
+		free(buffer);	
+	}
+
+	for (int i = 0; i < 100; ++i)
+	{
+		printf("%c", hex_data_string[i]);
+	}
+	printf("%s\n", hex_data_string);
 
 	// Write hex string back to a file.  Used for debugging.
 	//writeHexDataTofile(hexFile.fileData_Hex_String, hexFile.fileData_Hex_String_Size, hexFile.fhexByteCount, hexFile.hexFileLineCount);
@@ -271,8 +289,6 @@ int main(int argc, char *argv[])
 
 	// Write the UUE string to a file.  CURRENTLY BROKEN-ish.
 	writeUUEDataTofile(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index);
-	
-	
 
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	wake_devices();
@@ -1003,7 +1019,7 @@ void clearSpecChar()
 	}
 }
 
-int readByte(){
+unsigned char readByte(){
 	//Holds combined nibbles.
 	unsigned char hexValue;
 	
@@ -1021,6 +1037,8 @@ int readByte(){
 	hexValue |= (Ascii2Hex(charToPut));
 	//Return the byte.
 	totalCharsRead=totalCharsRead+2;
+
+
 	return hexValue;
 }
 
@@ -1051,7 +1069,89 @@ int readByte(){
 }
 */
 
+void hex_file_to_string(unsigned char* result, int size, int file_size)
+{
+	//To hold file hex values.
+	unsigned char hex_data_string[MAX_SIZE];
+	int hex_data_string_index = 0;
+	
 
+	unsigned char fhex_byte_count[MAX_SIZE_16];
+	unsigned char fhex_address1[MAX_SIZE_16];
+	unsigned char fhex_address2[MAX_SIZE_16];
+	int combined_address = 0;
+	unsigned char fhex_record_type[MAX_SIZE_16];
+	unsigned char fhex_check_sum[MAX_SIZE_16];
+
+	//To count through all characters in the file.
+	int file_char_index = 0;
+	int hex_data_index = 0;
+	int hex_line_index = 0;
+	
+	//Holds line count.	
+	int chars_this_line = 0;
+
+	//Loop through each character until EOF.
+	while(totalCharsRead  < file_size){
+		
+		//BYTE COUNT
+		fhex_byte_count[file_char_index] = readByte();
+		
+		//ADDRESS1 //Will create an 8 bit shift. --Bdk6's
+		fhex_address1[file_char_index] = readByte();
+		
+		//ADDRESS2
+		fhex_address2[file_char_index] = readByte();
+		
+		//RECORD TYPE
+		fhex_record_type[file_char_index] = readByte();	
+
+		if (fhex_record_type[file_char_index] == 0)
+		{
+			combined_address = fhex_address1[file_char_index];
+			combined_address <<= 8;
+			combined_address |= fhex_address2[file_char_index];
+			combined_address =  combined_address/16;
+		}
+		
+		//Throws the byte count (data bytes in this line) into an integer.
+		chars_this_line = fhex_byte_count[file_char_index];
+
+		//////// DATA ///////////////////
+		// We only want data. Discard other data types.
+		if (fhex_record_type[file_char_index] == 0)
+		{
+			
+			while (hex_data_index < chars_this_line && totalCharsRead < file_size && chars_this_line != 0x00)
+			{
+				//Store the completed hex value in the char array.
+				hex_data_string[hex_data_string_index] = readByte();
+				printf("%02X\n", hex_data_string[hex_data_string_index]);
+				//Index for data.
+				hex_data_string_index++;				
+			}
+
+		//Reset loop index for characters on this line.
+		hex_data_index = 0;
+		}
+		
+		//////// CHECK SUM //////////////
+		if (charToPut != 0xFF){
+			fhex_check_sum[file_char_index] = readByte();
+		}
+
+		hex_line_index++;
+		file_char_index++;
+	}
+
+	for (int i = 0; i < 450; ++i)
+	{
+		//printf("%02X ", hex_data_string[i]);
+	}
+	printf("STOP\n");
+	strncpy(result, hex_data_string, size);
+	//return hex_data_string;
+}
 //Convert file to one long char array.
 struct hexFile hexFileToCharArray(int fileSize)
 {
@@ -1066,6 +1166,8 @@ struct hexFile hexFileToCharArray(int fileSize)
 
 	int check_sum_count_45 = 0;
 	int check_sum_index = 0;
+
+	int fullAddress = 0;
 
 	//Loop through each character until EOF.
 	while(totalCharsRead  < fileSize){
@@ -1145,6 +1247,28 @@ struct hexFile hexFileToCharArray(int fileSize)
 	
 	return hexFile;
 }
+
+/*
+unsigned char UUEncode()
+{
+	// 1. Add char for characters per line.
+	// 2. Load 3 bytes into an array.
+	// 3. Encode array.
+	// 4. Add padding.
+	// 5. Replace ' ' with '''
+	// 6. Create checksum
+	// 7. Return string and checksum. (MIGHT MOVE THIS TO MAIN ALONG WITH CHAR COUNT).
+	unsigned char UUE_string[MAX_SIZE];
+	unsigned char byte_to_encode[3];
+	unsigned char uue_char[4];
+	int uue_length_char_index = 45;
+	int padded_index = 0;
+	int UUE_encoded_string_index = 0;
+
+
+
+}
+*/
 
 struct UUE_Data UUencode(struct hexFile hexFile)
 {

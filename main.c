@@ -65,6 +65,8 @@ void wake_devices();
 
 struct writeToRam write_to_ram(int varSize);
 
+int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum);
+
 //////////////////// Variables and Defines ////////////////////////////////////////////////////////
 
 //#define PIN_TX  0x01  /* Orange wire on FTDI cable */
@@ -143,6 +145,7 @@ int totalCharsRead = 0;
 int command_response_code;
 
 
+
 struct writeToRam{
 };
 // States for FTDI state machine.
@@ -210,12 +213,16 @@ int main(int argc, uint8_t *argv[])
 	// Holds the raw hex data, straight from the file.
 	uint8_t hex_data_array[MAX_SIZE];
 	uint8_t UUE_data_array[MAX_SIZE];
+	uint8_t uue_two_page_buffer[1024];
+
 	int hex_data_array_size = 0;
 	int UUE_data_array_size = 0;
 
 	// Holds hex data checksum, divided into 
 	// chunks of 900 bytes.
 	int hex_data_array_check_sum[MAX_SIZE_16];
+
+	
 	
 	// Stores file size.
 	int fileSize = 0;
@@ -267,6 +274,8 @@ int main(int argc, uint8_t *argv[])
 
 	// Write the UUE string to a file.  CURRENTLY BROKEN-ish.
 	writeUUEDataTofile(UUE_data_array, UUE_data_array_size);
+
+	uue_create_two_pages(uue_two_page_buffer, hex_data_array, hex_data_array_size, hex_data_array_check_sum);
 
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	wake_devices();
@@ -384,6 +393,20 @@ int main(int argc, uint8_t *argv[])
 
 	clearConsole();
 } // END PROGRAM
+
+int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum)
+{
+	// 1. Get 512 bytes of hex data (two pages).
+	// 2. Create UUEncode array from hex pages.
+	// 3. Create checksum for encoded pages.
+	// 4. Return checksum and UUEncoded array.
+
+	// 512 / .75 = 682.6666 ~ 686
+	uint8_t UUE_data_array[1024];
+
+
+
+}
 
 
 int check_sum(uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum)

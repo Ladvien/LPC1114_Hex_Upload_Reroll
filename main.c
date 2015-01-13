@@ -63,7 +63,7 @@ void Failed();
 void check_HM_10();
 void wake_devices();
 
-int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum);
+int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum, uint8_t * ram_address);
 
 int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum);
 
@@ -291,6 +291,13 @@ int main(int argc, uint8_t *argv[])
 	}
 	printf("UUE CHAR COUNT: %i\n", UUE_data_array_size);
 	
+	uint8_t ram_address[5];
+	ram_address[0] = 0x10;
+	ram_address[1] = 0x00;
+	ram_address[2] = 0x00;
+	ram_address[3] = 0x00;
+	ram_address[4] = '\n';
+	write_two_pages_to_ram(uue_two_page_buffer, hex_data_array_check_sum, ram_address);
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	//wake_devices();
 	
@@ -408,19 +415,44 @@ int main(int argc, uint8_t *argv[])
 	clearConsole();
 } // END PROGRAM
 
-int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum)
-{
-	// 1. Send write to command serially.
-	// 2. Convert RAM address from hex to decimal, then, from decimal to ASCII.
-	// 3. Create intent-to-write-to-ram string: "W 268435456 512\n"
-	// 4. Send intent-to-write string.
-	// 5. Send two pages of data: "DATA\n"
-	// 6. Send checksum: "Chk_sum\n"
-	// 7. Read response from LPC.
-	// 8. Determine if write was a success.
-	// 9. Repeat write if necessary.
 
+int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum, uint8_t * ram_address)
+{
+	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
+	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
+	// 3. Send intent-to-write string.
+	// 4. Send two pages of data: "DATA\n"
+	// 5. Send checksum: "Chk_sum\n"
+	// 6. Read response from LPC.
+	// 7. Determine if write was a success.
+	// 8. Repeat write if necessary.
+	// 9. Return true if successful (combine step 9?)
+
+
+	for (int i = 0; i < 4; ++i)
+	{
+		printf("%02X", ram_address[i]);
+	}
+	long int decimal_ram_address = 0;
+	
+	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
+
+	char der[5];
+	der[0] = 0x10;
+	der[1] = 0x00;
+	der[2] = 0x00;
+	der[3] = 0xAA;
+	der[4] = '\n';
+
+	const char * blah = der;
+
+	printf("%s\n", blah);
+	// Convert the hex string to base 16.
+	decimal_ram_address = strtol(blah, NULL, 10);
+	printf("%ld\n", decimal_ram_address);   
 }
+
+
 
 int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum)
 {

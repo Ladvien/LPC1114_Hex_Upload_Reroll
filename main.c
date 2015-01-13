@@ -142,7 +142,7 @@ uint8_t charToPut;
 //Total bytesRead.
 int totalCharsRead = 0;
 
-int command_response_code;
+int command_response_code = 0;
 
 
 
@@ -220,7 +220,7 @@ int main(int argc, uint8_t *argv[])
 
 	// Holds hex data checksum, divided into 
 	// chunks of 900 bytes.
-	int hex_data_array_check_sum[MAX_SIZE_16];
+	int hex_data_array_check_sum[112];
 
 	
 	
@@ -278,27 +278,27 @@ int main(int argc, uint8_t *argv[])
 	uue_create_two_pages(uue_two_page_buffer, hex_data_array, hex_data_array_size, hex_data_array_check_sum);
 
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
-	wake_devices();
+	//wake_devices();
 	
 	// Check the RSSI of HM-10.
-	check_HM_10();
+	//check_HM_10();
 
 	// Clear the console color.
 	clearConsole();
 	
 	// Set LPC into ISP mode.
-	set_ISP_mode(NO_PRINT);
+	//set_ISP_mode(NO_PRINT);
 
 	// Get LPC Device info.
-	get_LPC_Info(NO_PRINT);
+	//get_LPC_Info(NO_PRINT);
 
 	//Sleep(500); 
 	//txString(HM_RESET, sizeof(HM_RESET), PRINT, 0);
 	
 	// Send Unlock Code
-	txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
-	Sleep(500);
-	rx(PARSE, PRINT);
+	//txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
+	//Sleep(500);
+	//rx(PARSE, PRINT);
 
 	/*
 	// DEBUG NOTES:
@@ -401,9 +401,42 @@ int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array
 	// 3. Create checksum for encoded pages.
 	// 4. Return checksum and UUEncoded array.
 
-	// 512 / .75 = 682.6666 ~ 686
-	uint8_t UUE_data_array[1024];
+	int two_page_check_sum = 0;
 
+	for (int i = 0; i < 112; ++i)
+	{
+		hex_data_array_check_sum[i] = 0;
+	}
+
+	// 512 / .75 = 682.6666 ~ 686
+	uint8_t hex_two_page_array[2048];
+	int uue_two_page_char_count = 0;
+
+	// 1. Get 512 bytes of hex data (two pages).
+	for (int i = 0; i < 512; ++i)
+	{
+		hex_two_page_array[i] = hex_data_array[i];
+	}
+
+	// 2. Create UUEncode array from hex pages.
+	uue_two_page_char_count = UUEncode(uue_two_page_buffer, hex_two_page_array, 512);
+
+	for (int i = 0; i < uue_two_page_char_count; i)
+	{
+		for (int line_index = 0; line_index < 61; ++line_index)
+		{
+			printf("%C", uue_two_page_buffer[i]);
+			i++;
+		}
+		printf("\n");
+	}
+
+	// 3. Create checksum for encoded pages.
+	two_page_check_sum = check_sum(hex_data_array, 512, hex_data_array_check_sum);
+
+	printf("\n\nTWO PAGE CHK SUM: %i\n", two_page_check_sum);
+	
+	// 4. Return checksum and UUEncoded array.
 
 
 }
@@ -411,21 +444,16 @@ int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array
 
 int check_sum(uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum)
 {
+	int check_sum = 0;
 	int page_index = 0;
-	int line_count = 0;
 	int char_index = 0;
 
 	while(char_index < hex_data_array_size)
 	{
-		while(line_count < 900){
-			hex_data_array_check_sum[page_index] += hex_data_array[char_index];
-			char_index++;
-			line_count++;
-		}
-		line_count = 0;
-		page_index++;
+		check_sum += hex_data_array[char_index];
+		char_index++;
 	}
-	return 0;
+	return check_sum;
 }
 
 struct writeToRam write_to_ram(int varSize)
@@ -1257,7 +1285,7 @@ void startScreen()
 	printf("\n");
 	printf("\n");
 	printf("**************************************************************************\n");
-	printf("**** Mutant LPC1114 Downloader v.1                                   *****\n");
+	printf("**** Mutant LPC1114 Downloader v.76                                  *****\n");
 	printf("**** Hacked Out with Little Thought                                  *****\n");
 	printf("****                                   Thanks to Bdk6                *****\n");
 	printf("****                            His help was more than invaluable,   *****\n");

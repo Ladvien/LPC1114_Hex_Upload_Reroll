@@ -63,7 +63,7 @@ void Failed();
 void check_HM_10();
 void wake_devices();
 
-struct writeToRam write_to_ram(int varSize);
+int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum);
 
 int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum);
 
@@ -216,7 +216,9 @@ int main(int argc, uint8_t *argv[])
 	uint8_t uue_two_page_buffer[1024];
 
 	int hex_data_array_size = 0;
+	
 	int UUE_data_array_size = 0;
+	int uue_two_page_char_count = 0;
 
 	// Holds hex data checksum, divided into 
 	// chunks of 900 bytes.
@@ -269,14 +271,26 @@ int main(int argc, uint8_t *argv[])
 	// Convert hex data to UUE.
 	UUE_data_array_size = UUEncode(UUE_data_array, hex_data_array, hex_data_array_size);
 	
-	printf("UUE CHAR COUNT: %i\n", UUE_data_array_size);
+	
 
 
 	// Write the UUE string to a file.  CURRENTLY BROKEN-ish.
 	writeUUEDataTofile(UUE_data_array, UUE_data_array_size);
 
-	uue_create_two_pages(uue_two_page_buffer, hex_data_array, hex_data_array_size, hex_data_array_check_sum);
+	// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
+	uue_two_page_char_count = uue_create_two_pages(uue_two_page_buffer, hex_data_array, hex_data_array_size, hex_data_array_check_sum);
 
+	for (int i = 0; i < uue_two_page_char_count; i)
+	{
+		for (int line_index = 0; line_index < 61; ++line_index)
+		{
+			printf("%C", uue_two_page_buffer[i]);
+			i++;
+		}
+		printf("\n");
+	}
+	printf("UUE CHAR COUNT: %i\n", UUE_data_array_size);
+	
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	//wake_devices();
 	
@@ -394,6 +408,20 @@ int main(int argc, uint8_t *argv[])
 	clearConsole();
 } // END PROGRAM
 
+int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum)
+{
+	// 1. Send write to command serially.
+	// 2. Convert RAM address from hex to decimal, then, from decimal to ASCII.
+	// 3. Create intent-to-write-to-ram string: "W 268435456 512\n"
+	// 4. Send intent-to-write string.
+	// 5. Send two pages of data: "DATA\n"
+	// 6. Send checksum: "Chk_sum\n"
+	// 7. Read response from LPC.
+	// 8. Determine if write was a success.
+	// 9. Repeat write if necessary.
+
+}
+
 int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum)
 {
 	// 1. Get 512 bytes of hex data (two pages).
@@ -402,12 +430,6 @@ int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array
 	// 4. Return checksum and UUEncoded array.
 
 	int two_page_check_sum = 0;
-
-	for (int i = 0; i < 112; ++i)
-	{
-		hex_data_array_check_sum[i] = 0;
-	}
-
 	// 512 / .75 = 682.6666 ~ 686
 	uint8_t hex_two_page_array[2048];
 	int uue_two_page_char_count = 0;
@@ -421,23 +443,13 @@ int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array
 	// 2. Create UUEncode array from hex pages.
 	uue_two_page_char_count = UUEncode(uue_two_page_buffer, hex_two_page_array, 512);
 
-	for (int i = 0; i < uue_two_page_char_count; i)
-	{
-		for (int line_index = 0; line_index < 61; ++line_index)
-		{
-			printf("%C", uue_two_page_buffer[i]);
-			i++;
-		}
-		printf("\n");
-	}
-
 	// 3. Create checksum for encoded pages.
 	two_page_check_sum = check_sum(hex_data_array, 512, hex_data_array_check_sum);
 
 	printf("\n\nTWO PAGE CHK SUM: %i\n", two_page_check_sum);
 	
 	// 4. Return checksum and UUEncoded array.
-
+	return uue_two_page_char_count;
 
 }
 
@@ -456,25 +468,8 @@ int check_sum(uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_
 	return check_sum;
 }
 
-struct writeToRam write_to_ram(int varSize)
-{
-	char blah[varSize];
 
-	blah[0] = 'A';
-	blah[1] = 'S';
-	blah[2] = 'S';
-	blah[3] = '\0';
-	blah[4] = '0';
 
-	for (int i = 0; i < 1200; ++i)
-	{
-		//blah[i] = 'D';
-		printf("%s ", blah);
-		Sleep(500);
-	}
-	
-
-}
 
 ///////////// LPC Handling ///////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

@@ -415,6 +415,22 @@ int main(int argc, uint8_t *argv[])
 	clearConsole();
 } // END PROGRAM
 
+int hex_decimal(char hex[])   /* Function to convert hexadecimal to decimal. */
+{
+    int i, length, sum=0;
+    for(length=0; hex[length]!='\0'; ++length);
+    for(i=0; hex[i]!='\0'; ++i, --length)
+    {
+        if(hex[i]>='0' && hex[i]<='9')
+            sum+=(hex[i]-'0')*pow(16,length-1);
+        if(hex[i]>='A' && hex[i]<='F')
+            sum+=(hex[i]-55)*pow(16,length-1);
+        if(hex[i]>='a' && hex[i]<='f')
+            sum+=(hex[i]-87)*pow(16,length-1);
+    }
+    printf("%lu\n", sum);
+    return sum;
+}
 
 int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum, uint8_t * ram_address)
 {
@@ -437,18 +453,22 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 	
 	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
 
-	char der[5];
-	der[0] = 0x10;
-	der[1] = 0x00;
-	der[2] = 0x00;
-	der[3] = 0xAA;
-	der[4] = '\n';
+	char der[9];
+	der[0] = '1';
+	der[1] = '0';
+	der[2] = '0';
+	der[3] = '0';
+	der[4] = '0';
+	der[5] = '0';
+	der[6] = '0';
+	der[7] = '0';
+	der[8] = '\n';
 
-	const char * blah = der;
+	//decimal_ram_address = hex_decimal(der);
 
-	printf("%s\n", blah);
+	printf("%s\n", ram_address);
 	// Convert the hex string to base 16.
-	decimal_ram_address = strtol(blah, NULL, 10);
+	decimal_ram_address = strtol(der, NULL, 16);
 	printf("%ld\n", decimal_ram_address);   
 }
 

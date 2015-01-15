@@ -416,24 +416,25 @@ int main(int argc, uint8_t *argv[])
 } // END PROGRAM
 
 
-int Hex2Int(uint8_t c)
+void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string)
 {
-	int first = c / 16 - 3;
-	int second = c % 16;
-	int result = first*10 + second;
-	//if(result > 9) result--;
-	return result;
-}
+	int char_index = 0;
+	char buf_nybble;
+	uint32_t buf_address = address;
 
-int Hex2Ascii(uint8_t hexValue)
-{
-	uint8_t c = hexValue >>= 4;
-	hexValue <<= 4;
-	uint8_t d = hexValue >>= 4;
-
-	int high = Hex2Int(c) * 16;
-	int low = Hex2Int(d);
-	return high+low;
+	
+	while(char_index < 8)
+	{
+		buf_address = address;
+		buf_nybble = ((buf_address << char_index*4) >> 28);
+		buf_nybble = buf_nybble + '0';
+		if (buf_nybble > 0x39)
+		{
+			buf_nybble = buf_nybble + 7;
+		}
+		address_as_string[char_index] = buf_nybble;
+		char_index++;
+	}
 }
 
 int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum, uint8_t * ram_address)
@@ -448,7 +449,7 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 	// 8. Repeat write if necessary.
 	// 9. Return true if successful (combine step 9?)
 
-
+	uint8_t address_as_string[9];
 	for (int i = 0; i < 4; ++i)
 	{
 		//printf("%02X", ram_address[i]);
@@ -458,26 +459,11 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 	
 	decimal_ram_address = 0xA1111111;
 
-	uint8_t test = decimal_ram_address >> 28;
-	//test <<= 28;
-	test = test + '0';
-	if (test > 0x39)
-	{
-		test = test + 7;
-	}
-
+	uint8_t test[9];
+	convert_32_hex_address_to_string(decimal_ram_address, address_as_string);
+	
+	printf("%s\n", address_as_string);
 	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
-
-	char der[9];
-	der[0] = '1';
-	der[1] = '0';
-	der[2] = '0';
-	der[3] = '0';
-	der[4] = '0';
-	der[5] = '0';
-	der[6] = '0';
-	der[7] = '0';
-	der[8] = '\n';
 
 	//decimal_ram_address = hex_decimal(der);
 

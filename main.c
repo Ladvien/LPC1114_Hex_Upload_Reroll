@@ -418,16 +418,20 @@ int main(int argc, uint8_t *argv[])
 
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string)
 {
+	// 1. Divide 32 bit int into nybbles.
+	// 2. Convert nybble into character.
+	// 3. Place characters into string.
 	int char_index = 0;
 	char buf_nybble;
 	uint32_t buf_address = address;
 
-	
+	// Loop through all 8 nybbles.
 	while(char_index < 8)
 	{
 		buf_address = address;
 		buf_nybble = ((buf_address << char_index*4) >> 28);
 		buf_nybble = buf_nybble + '0';
+		// If a letter, let's compensate.
 		if (buf_nybble > 0x39)
 		{
 			buf_nybble = buf_nybble + 7;

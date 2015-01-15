@@ -291,6 +291,31 @@ int main(int argc, uint8_t *argv[])
 	}
 	printf("UUE CHAR COUNT: %i\n", UUE_data_array_size);
 	
+	
+	
+	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
+	wake_devices();
+	
+	// Check the RSSI of HM-10.
+	check_HM_10();
+
+	// Clear the console color.
+	clearConsole();
+	
+	// Set LPC into ISP mode.
+	set_ISP_mode(NO_PRINT);
+
+	// Get LPC Device info.
+	get_LPC_Info(NO_PRINT);
+
+	//Sleep(500); 
+	//txString(HM_RESET, sizeof(HM_RESET), PRINT, 0);
+	
+	// Send Unlock Code
+	txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
+	Sleep(500);
+	rx(PARSE, PRINT);
+	
 	uint8_t ram_address[5];
 	ram_address[0] = 0x10;
 	ram_address[1] = 0x00;
@@ -298,30 +323,6 @@ int main(int argc, uint8_t *argv[])
 	ram_address[3] = 0x00;
 	ram_address[4] = '\n';
 	write_two_pages_to_ram(uue_two_page_buffer, hex_data_array_check_sum, ram_address);
-	
-	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
-	//wake_devices();
-	
-	// Check the RSSI of HM-10.
-	//check_HM_10();
-
-	// Clear the console color.
-	clearConsole();
-	
-	// Set LPC into ISP mode.
-	//set_ISP_mode(NO_PRINT);
-
-	// Get LPC Device info.
-	//get_LPC_Info(NO_PRINT);
-
-	//Sleep(500); 
-	//txString(HM_RESET, sizeof(HM_RESET), PRINT, 0);
-	
-	// Send Unlock Code
-	//txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
-	//Sleep(500);
-	//rx(PARSE, PRINT);
-
 	/*
 	// DEBUG NOTES:
 	// It seems the hexFile.original_data_checksum printed from the hexRead function
@@ -460,6 +461,7 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 	long int dec_ram_address = 0;
 	uint8_t dec_address_as_string[32];
 	uint8_t intent_to_write_to_ram_string[128];
+	uint8_t checksum_as_string[64];
 
 	hex_ram_address = 0x10000000; // Test address.
 
@@ -473,7 +475,23 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 	snprintf(intent_to_write_to_ram_string, sizeof intent_to_write_to_ram_string, "W %d 512\n");
 
 	printf("%s\n", intent_to_write_to_ram_string);
-   
+	
+	// 3. Send intent-to-write string.
+	txString(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), PRINT, 0);
+	Sleep(200);
+	rx(PARSE, PRINT);
+
+	// 4. Send two pages of data: "DATA\n"
+	txString(uue_two_page_buffer, sizeof(uue_two_page_buffer), PRINT, 30);
+	txString("\n", sizeof("\n"), PRINT, 0);
+	rx(PARSE, PRINT);
+	Sleep(200);
+	snprintf(checksum_as_string, 10, "%d", hex_data_array_check_sum[0]);
+
+	txString(checksum_as_string, sizeof(checksum_as_string), PRINT, 0);
+	txString("\n", sizeof("\n"), PRINT, 0);
+	rx(PARSE, PRINT);
+
 
 }
 
@@ -502,7 +520,7 @@ int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array
 
 	// 3. Create checksum for encoded pages.
 	two_page_check_sum = check_sum(hex_data_array, 512, hex_data_array_check_sum);
-
+	hex_data_array_check_sum[0] = two_page_check_sum;
 	printf("\n\nTWO PAGE CHK SUM: %i\n", two_page_check_sum);
 	
 	// 4. Return checksum and UUEncoded array.

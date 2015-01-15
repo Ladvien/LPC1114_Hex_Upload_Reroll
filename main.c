@@ -298,6 +298,7 @@ int main(int argc, uint8_t *argv[])
 	ram_address[3] = 0x00;
 	ram_address[4] = '\n';
 	write_two_pages_to_ram(uue_two_page_buffer, hex_data_array_check_sum, ram_address);
+	
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	//wake_devices();
 	
@@ -453,31 +454,27 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 	// 8. Repeat write if necessary.
 	// 9. Return true if successful (combine step 9?)
 
-	uint8_t address_as_string[9];
-	for (int i = 0; i < 4; ++i)
-	{
-		//printf("%02X", ram_address[i]);
-	}
-	
-	uint32_t decimal_ram_address = 0;
-	
-	decimal_ram_address = 0xA1111111;
-
-	uint8_t test[9];
-	convert_32_hex_address_to_string(decimal_ram_address, address_as_string);
-	
-	printf("%s\n", address_as_string);
 	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
+	uint8_t address_as_string[9];
+	uint32_t hex_ram_address = 0;
+	long int dec_ram_address = 0;
+	uint8_t dec_address_as_string[32];
+	uint8_t intent_to_write_to_ram_string[128];
 
-	//decimal_ram_address = hex_decimal(der);
+	hex_ram_address = 0x10000000; // Test address.
 
-	//printf("%s\n", ram_address);
-	// Convert the hex string to base 16.
-	//decimal_ram_address = strtol(der, NULL, 16);
-	//printf("%ld\n", decimal_ram_address);   
+	convert_32_hex_address_to_string(hex_ram_address, address_as_string);
 
-	printf("\nHEX: %02X\n", test);
-	printf("\nCHAR: %C\n", test);
+	dec_ram_address = strtol(address_as_string, NULL, 16);
+
+	snprintf(dec_address_as_string, 10, "%d", dec_ram_address);
+
+	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
+	snprintf(intent_to_write_to_ram_string, sizeof intent_to_write_to_ram_string, "W %d 512\n");
+
+	printf("%s\n", intent_to_write_to_ram_string);
+   
+
 }
 
 

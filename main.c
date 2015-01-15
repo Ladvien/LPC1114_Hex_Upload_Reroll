@@ -415,21 +415,25 @@ int main(int argc, uint8_t *argv[])
 	clearConsole();
 } // END PROGRAM
 
-int hex_decimal(char hex[])   /* Function to convert hexadecimal to decimal. */
+
+int Hex2Int(uint8_t c)
 {
-    int i, length, sum=0;
-    for(length=0; hex[length]!='\0'; ++length);
-    for(i=0; hex[i]!='\0'; ++i, --length)
-    {
-        if(hex[i]>='0' && hex[i]<='9')
-            sum+=(hex[i]-'0')*pow(16,length-1);
-        if(hex[i]>='A' && hex[i]<='F')
-            sum+=(hex[i]-55)*pow(16,length-1);
-        if(hex[i]>='a' && hex[i]<='f')
-            sum+=(hex[i]-87)*pow(16,length-1);
-    }
-    printf("%lu\n", sum);
-    return sum;
+	int first = c / 16 - 3;
+	int second = c % 16;
+	int result = first*10 + second;
+	//if(result > 9) result--;
+	return result;
+}
+
+int Hex2Ascii(uint8_t hexValue)
+{
+	uint8_t c = hexValue >>= 4;
+	hexValue <<= 4;
+	uint8_t d = hexValue >>= 4;
+
+	int high = Hex2Int(c) * 16;
+	int low = Hex2Int(d);
+	return high+low;
 }
 
 int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum, uint8_t * ram_address)
@@ -447,10 +451,21 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 
 	for (int i = 0; i < 4; ++i)
 	{
-		printf("%02X", ram_address[i]);
+		//printf("%02X", ram_address[i]);
 	}
-	long int decimal_ram_address = 0;
 	
+	uint32_t decimal_ram_address = 0;
+	
+	decimal_ram_address = 0xA1111111;
+
+	uint8_t test = decimal_ram_address >> 28;
+	//test <<= 28;
+	test = test + '0';
+	if (test > 0x39)
+	{
+		test = test + 7;
+	}
+
 	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
 
 	char der[9];
@@ -466,10 +481,13 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 
 	//decimal_ram_address = hex_decimal(der);
 
-	printf("%s\n", ram_address);
+	//printf("%s\n", ram_address);
 	// Convert the hex string to base 16.
-	decimal_ram_address = strtol(der, NULL, 16);
-	printf("%ld\n", decimal_ram_address);   
+	//decimal_ram_address = strtol(der, NULL, 16);
+	//printf("%ld\n", decimal_ram_address);   
+
+	printf("\nHEX: %02X\n", test);
+	printf("\nCHAR: %C\n", test);
 }
 
 
@@ -1072,25 +1090,7 @@ static uint8_t Ascii2Hex(uint8_t c)
 	return 0;  // this "return" will never be reached, but some compilers give a warning if it is not present
 } 
 
-int Hex2Int(uint8_t c)
-{
-	int first = c / 16 - 3;
-	int second = c % 16;
-	int result = first*10 + second;
-	//if(result > 9) result--;
-	return result;
-}
 
-int Hex2Ascii(uint8_t hexValue)
-{
-	uint8_t c = hexValue >>= 4;
-	hexValue <<= 4;
-	uint8_t d = hexValue >>= 4;
-
-	int high = Hex2Int(c) * 16;
-	int low = Hex2Int(d);
-	return high+low;
-}
 
 void clearSpecChar()
 {

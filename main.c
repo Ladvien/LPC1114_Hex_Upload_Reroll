@@ -37,7 +37,7 @@ uint8_t set_ISP_mode(int print);
 
 // Data Handling
 int hex_file_to_array(uint8_t * hex_data_array, int file_size);
-int check_sum(uint8_t * hex_data_array, int file_size, int * hex_data_array_check_sum);
+int check_sum(uint8_t * hex_data_array, int file_size);
 int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_array_size);
 
 
@@ -63,10 +63,10 @@ void Failed();
 void check_HM_10();
 void wake_devices();
 
-int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum, uint8_t * ram_address);
+int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, uint8_t * ram_address, int uue_two_page_char_count, int two_page_check_sum);
 
-int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum);
-
+int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * two_page_check_sum);
+void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
 //////////////////// Variables and Defines ////////////////////////////////////////////////////////
 
 //#define PIN_TX  0x01  /* Orange wire on FTDI cable */
@@ -219,10 +219,11 @@ int main(int argc, uint8_t *argv[])
 	
 	int UUE_data_array_size = 0;
 	int uue_two_page_char_count = 0;
-
+	int two_page_check_sum = 0;
+	
 	// Holds hex data checksum, divided into 
 	// chunks of 900 bytes.
-	int hex_data_array_check_sum[112];
+	long int check_sum_bfr = 0;
 
 	
 	
@@ -259,13 +260,13 @@ int main(int argc, uint8_t *argv[])
 	hex_data_array_size = hex_file_to_array(hex_data_array, fileSize);
 	
 	// Get checksum int array.
-	check_sum(hex_data_array, fileSize, hex_data_array_check_sum);
+	//check_sum(hex_data_array, fileSize, check_sum_bfr);
 	
 	// Write hex string back to a file.  Used for debugging.
 	writeHexDataTofile(hex_data_array, hex_data_array_size);
 	
 	// DEBUG:
-	printf("\n\nCHECKSUM:       %i %i\n", hex_data_array_check_sum[0], hex_data_array_check_sum[1]);
+	//printf("\n\nCHECKSUM:       %i %i\n", check_sum_bfr);
 	printf("# DATA BYTES:   %i \n", hex_data_array_size);
 		
 	// Convert hex data to UUE.
@@ -278,8 +279,8 @@ int main(int argc, uint8_t *argv[])
 	writeUUEDataTofile(UUE_data_array, UUE_data_array_size);
 
 	// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
-	uue_two_page_char_count = uue_create_two_pages(uue_two_page_buffer, hex_data_array, hex_data_array_size, hex_data_array_check_sum);
-
+	uue_two_page_char_count = uue_create_two_pages(uue_two_page_buffer, hex_data_array, hex_data_array_size, &two_page_check_sum);
+	printf("\n\nTWO PAGE CHK SUM: %i\n", two_page_check_sum);
 	for (int i = 0; i < uue_two_page_char_count; i)
 	{
 		for (int line_index = 0; line_index < 61; ++line_index)
@@ -322,7 +323,7 @@ int main(int argc, uint8_t *argv[])
 	ram_address[2] = 0x00;
 	ram_address[3] = 0x00;
 	ram_address[4] = '\n';
-	write_two_pages_to_ram(uue_two_page_buffer, hex_data_array_check_sum, ram_address);
+	write_two_pages_to_ram(uue_two_page_buffer, ram_address, uue_two_page_char_count, two_page_check_sum);
 	/*
 	// DEBUG NOTES:
 	// It seems the hexFile.original_data_checksum printed from the hexRead function
@@ -417,6 +418,59 @@ int main(int argc, uint8_t *argv[])
 	clearConsole();
 } // END PROGRAM
 
+// Issues:
+// 1. intent to write string needs to be derived from byte to write var.
+// 2. Fix check_sum being an array.
+// 3. Create a flow of functions for writing to ram.
+// 4. Address the "M" in UUE data.
+// 5. Assure when writing to RAM we are not writing unused array spaces.
+
+int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * two_page_check_sum)
+{
+	// 0. Add a check to see if data is insufficient for two pages,
+	// if so, divert to "get_data_chunk()"
+	// 1. Get 512 bytes of hex data (two pages).
+	// 2. Create UUEncode array from hex pages.
+	// 3. Create checksum for encoded pages.
+	// 4. Return checksum and UUEncoded array.
+
+	
+	// 512 / .75 = 682.6666 ~ 686
+	uint8_t hex_two_page_array[2048];
+	int uue_two_page_char_count = 0;
+
+	// 1. Get 512 bytes of hex data (two pages).
+	for (int i = 0; i < 512; ++i)
+	{
+		hex_two_page_array[i] = hex_data_array[i];
+	}
+
+	// 2. Create UUEncode array from hex pages.
+	uue_two_page_char_count = UUEncode(uue_two_page_buffer, hex_two_page_array, 512);
+
+	// 3. Create checksum for encoded pages.
+	*two_page_check_sum = check_sum(hex_data_array, 512);
+
+	
+	
+	// 4. Return checksum and UUEncoded array.
+	return uue_two_page_char_count;
+
+}
+
+int check_sum(uint8_t * hex_data_array, int hex_data_array_size)
+{
+	int check_sum = 0;
+	int page_index = 0;
+	int char_index = 0;
+
+	while(char_index < hex_data_array_size)
+	{
+		check_sum += hex_data_array[char_index];
+		char_index++;
+	}
+	return check_sum;
+}
 
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string)
 {
@@ -443,7 +497,7 @@ void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_str
 	}
 }
 
-int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum, uint8_t * ram_address)
+int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, uint8_t * ram_address, int uue_two_page_char_count, int two_page_check_sum)
 {
 	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
@@ -463,6 +517,7 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 	uint8_t intent_to_write_to_ram_string[128];
 	uint8_t checksum_as_string[64];
 
+
 	hex_ram_address = 0x10000000; // Test address.
 
 	convert_32_hex_address_to_string(hex_ram_address, address_as_string);
@@ -478,20 +533,23 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 	
 	
 	// 3. Send intent-to-write string.
-	txString(intent_to_write_to_ram_string, 15, PRINT, 0);
+	txString(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), PRINT, 0);
+	txString("\n", sizeof("\n"), PRINT, 0);
 	Sleep(200);
 	rx(NO_PARSE, PRINT);
 
 	// 4. Send two pages of data: "DATA\n"
-	txString("$%`^H%P``", sizeof("$%`^H%P``"), PRINT, 5);
+	//txString("$%`^H%P``", sizeof("$%`^H%P``"), PRINT, 4);
+	txString(uue_two_page_buffer, 6, PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
 	rx(NO_PARSE, PRINT);
 	//Sleep(300);
-	snprintf(checksum_as_string, 10, "%i", 226);
 
-	txString("226", sizeof("226"), PRINT, 0);
+	snprintf(checksum_as_string, 10, "%i", two_page_check_sum);
+
+	txString(checksum_as_string, 3, PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
-	Sleep(300);
+	Sleep(600);
 	rx(NO_PARSE, PRINT);
 	
 	//txString("W 268435456 4\n", sizeof("W 268435456 4\n"), PRINT, 10);
@@ -505,51 +563,10 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 
 
 
-int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum)
-{
-	// 1. Get 512 bytes of hex data (two pages).
-	// 2. Create UUEncode array from hex pages.
-	// 3. Create checksum for encoded pages.
-	// 4. Return checksum and UUEncoded array.
-
-	int two_page_check_sum = 0;
-	// 512 / .75 = 682.6666 ~ 686
-	uint8_t hex_two_page_array[2048];
-	int uue_two_page_char_count = 0;
-
-	// 1. Get 512 bytes of hex data (two pages).
-	for (int i = 0; i < 512; ++i)
-	{
-		hex_two_page_array[i] = hex_data_array[i];
-	}
-
-	// 2. Create UUEncode array from hex pages.
-	uue_two_page_char_count = UUEncode(uue_two_page_buffer, hex_two_page_array, 512);
-
-	// 3. Create checksum for encoded pages.
-	two_page_check_sum = check_sum(hex_data_array, 512, hex_data_array_check_sum);
-	hex_data_array_check_sum[0] = two_page_check_sum;
-	printf("\n\nTWO PAGE CHK SUM: %i\n", two_page_check_sum);
-	
-	// 4. Return checksum and UUEncoded array.
-	return uue_two_page_char_count;
-
-}
 
 
-int check_sum(uint8_t * hex_data_array, int hex_data_array_size, int * hex_data_array_check_sum)
-{
-	int check_sum = 0;
-	int page_index = 0;
-	int char_index = 0;
 
-	while(char_index < hex_data_array_size)
-	{
-		check_sum += hex_data_array[char_index];
-		char_index++;
-	}
-	return check_sum;
-}
+
 
 
 

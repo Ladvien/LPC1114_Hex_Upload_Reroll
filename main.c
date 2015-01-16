@@ -293,7 +293,6 @@ int main(int argc, uint8_t *argv[])
 	printf("UUE CHAR COUNT: %i\n", UUE_data_array_size);
 	
 	
-	
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	wake_devices();
 	
@@ -428,32 +427,39 @@ int main(int argc, uint8_t *argv[])
 int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array, int hex_data_array_size, int * two_page_check_sum)
 {
 	// 0. Add a check to see if data is insufficient for two pages,
-	// if so, divert to "get_data_chunk()"
+	// if so, divert to get_scrap_paper().
 	// 1. Get 512 bytes of hex data (two pages).
 	// 2. Create UUEncode array from hex pages.
 	// 3. Create checksum for encoded pages.
 	// 4. Return checksum and UUEncoded array.
-
-	
-	// 512 / .75 = 682.6666 ~ 686
-	uint8_t hex_two_page_array[2048];
 	int uue_two_page_char_count = 0;
-
-	// 1. Get 512 bytes of hex data (two pages).
-	for (int i = 0; i < 512; ++i)
+	uint8_t hex_two_page_array[2048];
+	
+	if (hex_data_array_size < 512)
 	{
-		hex_two_page_array[i] = hex_data_array[i];
+		// Get scrap.
+		printf("BOOO!\n");
 	}
+	else
+	{
+		// Get two pages.
+		// 512 / .75 = 682.6666 ~ 686
+		
+		// 1. Get 512 bytes of hex data (two pages).
+		for (int i = 0; i < 512; ++i)
+		{
+			hex_two_page_array[i] = hex_data_array[i];
+		}
 
-	// 2. Create UUEncode array from hex pages.
-	uue_two_page_char_count = UUEncode(uue_two_page_buffer, hex_two_page_array, 512);
+		// 2. Create UUEncode array from hex pages.
+		uue_two_page_char_count = UUEncode(uue_two_page_buffer, hex_two_page_array, 512);
 
-	// 3. Create checksum for encoded pages.
-	*two_page_check_sum = check_sum(hex_data_array, 512);
+		// 3. Create checksum for encoded pages.
+		*two_page_check_sum = check_sum(hex_data_array, 512);
 
+		// 4. Return checksum and UUEncoded array.
+	}
 	
-	
-	// 4. Return checksum and UUEncoded array.
 	return uue_two_page_char_count;
 
 }
@@ -527,27 +533,27 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, uint8_t * ram_address,
 	snprintf(dec_address_as_string, 10, "%d", dec_ram_address);
 
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
-	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %d 4\n");
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %d 512\n");
 
 	printf("%s\n", intent_to_write_to_ram_string);
 	
 	
 	// 3. Send intent-to-write string.
-	txString(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), PRINT, 0);
+	txString(intent_to_write_to_ram_string, 16, PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
 	Sleep(200);
 	rx(NO_PARSE, PRINT);
 
 	// 4. Send two pages of data: "DATA\n"
 	//txString("$%`^H%P``", sizeof("$%`^H%P``"), PRINT, 4);
-	txString(uue_two_page_buffer, 6, PRINT, 0);
+	txString(uue_two_page_buffer, 697, PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
 	rx(NO_PARSE, PRINT);
-	//Sleep(300);
+	Sleep(300);
 
 	snprintf(checksum_as_string, 10, "%i", two_page_check_sum);
 
-	txString(checksum_as_string, 3, PRINT, 0);
+	txString(checksum_as_string, 4, PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
 	Sleep(600);
 	rx(NO_PARSE, PRINT);
@@ -1016,22 +1022,13 @@ uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequ
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
 		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), &bytes);
 		Sleep(frequency_of_tx_char);
-	}	
-
-	// Let's check if the send string contains a newline character.
-	uint8_t * newLineTest = strstr(string, "\n");
-	// No? Let's add it.
-	if(printOrNot){
-		if (newLineTest == '\0')
+		if(printOrNot)
 		{
 			setTextRed();
-			printf("%s\n", string);
+			printf("%C", string[i]);
 		}
-		else{
-			setTextRed();
-			printf("%s", string);	
-		}	
-	}
+	}	
+	clearConsole();
 }
 
 ///////////// Debugging //////////////////////////////////////////////////////////////////////
@@ -1253,6 +1250,7 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 	int padded_index = 0;
 	int bytes_left = 0;
 	
+
 	// 1. Add char for characters per line.
 	if(hex_data_array_size < 45)
 	{

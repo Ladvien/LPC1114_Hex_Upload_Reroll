@@ -472,27 +472,35 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 	snprintf(dec_address_as_string, 10, "%d", dec_ram_address);
 
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
-	snprintf(intent_to_write_to_ram_string, sizeof intent_to_write_to_ram_string, "W %d 512\n");
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %d 4\n");
 
 	printf("%s\n", intent_to_write_to_ram_string);
 	
+	
 	// 3. Send intent-to-write string.
-	txString(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), PRINT, 0);
+	txString(intent_to_write_to_ram_string, 15, PRINT, 0);
 	Sleep(200);
-	rx(PARSE, PRINT);
+	rx(NO_PARSE, PRINT);
 
 	// 4. Send two pages of data: "DATA\n"
-	txString(uue_two_page_buffer, sizeof(uue_two_page_buffer), PRINT, 30);
+	txString("$%`^H%P``", sizeof("$%`^H%P``"), PRINT, 5);
 	txString("\n", sizeof("\n"), PRINT, 0);
-	rx(PARSE, PRINT);
-	Sleep(200);
-	snprintf(checksum_as_string, 10, "%d", hex_data_array_check_sum[0]);
+	rx(NO_PARSE, PRINT);
+	//Sleep(300);
+	snprintf(checksum_as_string, 10, "%i", 226);
 
-	txString(checksum_as_string, sizeof(checksum_as_string), PRINT, 0);
+	txString("226", sizeof("226"), PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
-	rx(PARSE, PRINT);
-
-
+	Sleep(300);
+	rx(NO_PARSE, PRINT);
+	
+	//txString("W 268435456 4\n", sizeof("W 268435456 4\n"), PRINT, 10);
+	//Sleep(200);
+	//rx(NO_PARSE, PRINT);
+	//txString("$%`^H%P`````````````````````\n", sizeof("$%`^H%P`````````````````````\n"), PRINT, 5);
+	//txString("226\n", sizeof("226\n"), PRINT, 5);
+	//Sleep(200);
+	//rx(NO_PARSE, PRINT);
 }
 
 

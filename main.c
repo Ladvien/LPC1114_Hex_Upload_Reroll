@@ -291,6 +291,31 @@ int main(int argc, uint8_t *argv[])
 	}
 	printf("UUE CHAR COUNT: %i\n", UUE_data_array_size);
 	
+	
+	
+	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
+	wake_devices();
+	
+	// Check the RSSI of HM-10.
+	check_HM_10();
+
+	// Clear the console color.
+	clearConsole();
+	
+	// Set LPC into ISP mode.
+	set_ISP_mode(NO_PRINT);
+
+	// Get LPC Device info.
+	get_LPC_Info(NO_PRINT);
+
+	//Sleep(500); 
+	//txString(HM_RESET, sizeof(HM_RESET), PRINT, 0);
+	
+	// Send Unlock Code
+	txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
+	Sleep(500);
+	rx(PARSE, PRINT);
+	
 	uint8_t ram_address[5];
 	ram_address[0] = 0x10;
 	ram_address[1] = 0x00;
@@ -298,29 +323,6 @@ int main(int argc, uint8_t *argv[])
 	ram_address[3] = 0x00;
 	ram_address[4] = '\n';
 	write_two_pages_to_ram(uue_two_page_buffer, hex_data_array_check_sum, ram_address);
-	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
-	//wake_devices();
-	
-	// Check the RSSI of HM-10.
-	//check_HM_10();
-
-	// Clear the console color.
-	clearConsole();
-	
-	// Set LPC into ISP mode.
-	//set_ISP_mode(NO_PRINT);
-
-	// Get LPC Device info.
-	//get_LPC_Info(NO_PRINT);
-
-	//Sleep(500); 
-	//txString(HM_RESET, sizeof(HM_RESET), PRINT, 0);
-	
-	// Send Unlock Code
-	//txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
-	//Sleep(500);
-	//rx(PARSE, PRINT);
-
 	/*
 	// DEBUG NOTES:
 	// It seems the hexFile.original_data_checksum printed from the hexRead function
@@ -415,21 +417,30 @@ int main(int argc, uint8_t *argv[])
 	clearConsole();
 } // END PROGRAM
 
-int hex_decimal(char hex[])   /* Function to convert hexadecimal to decimal. */
+
+void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string)
 {
-    int i, length, sum=0;
-    for(length=0; hex[length]!='\0'; ++length);
-    for(i=0; hex[i]!='\0'; ++i, --length)
-    {
-        if(hex[i]>='0' && hex[i]<='9')
-            sum+=(hex[i]-'0')*pow(16,length-1);
-        if(hex[i]>='A' && hex[i]<='F')
-            sum+=(hex[i]-55)*pow(16,length-1);
-        if(hex[i]>='a' && hex[i]<='f')
-            sum+=(hex[i]-87)*pow(16,length-1);
-    }
-    printf("%lu\n", sum);
-    return sum;
+	// 1. Divide 32 bit int into nybbles.
+	// 2. Convert nybble into character.
+	// 3. Place characters into string.
+	int char_index = 0;
+	char buf_nybble;
+	uint32_t buf_address = address;
+
+	// Loop through all 8 nybbles.
+	while(char_index < 8)
+	{
+		buf_address = address;
+		buf_nybble = ((buf_address << char_index*4) >> 28);
+		buf_nybble = buf_nybble + '0';
+		// If a letter, let's compensate.
+		if (buf_nybble > 0x39)
+		{
+			buf_nybble = buf_nybble + 7;
+		}
+		address_as_string[char_index] = buf_nybble;
+		char_index++;
+	}
 }
 
 int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_check_sum, uint8_t * ram_address)
@@ -444,32 +455,52 @@ int write_two_pages_to_ram(uint8_t * uue_two_page_buffer, int * hex_data_array_c
 	// 8. Repeat write if necessary.
 	// 9. Return true if successful (combine step 9?)
 
-
-	for (int i = 0; i < 4; ++i)
-	{
-		printf("%02X", ram_address[i]);
-	}
-	long int decimal_ram_address = 0;
-	
 	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
+	uint8_t address_as_string[9];
+	uint32_t hex_ram_address = 0;
+	long int dec_ram_address = 0;
+	uint8_t dec_address_as_string[32];
+	uint8_t intent_to_write_to_ram_string[128];
+	uint8_t checksum_as_string[64];
 
-	char der[9];
-	der[0] = '1';
-	der[1] = '0';
-	der[2] = '0';
-	der[3] = '0';
-	der[4] = '0';
-	der[5] = '0';
-	der[6] = '0';
-	der[7] = '0';
-	der[8] = '\n';
+	hex_ram_address = 0x10000000; // Test address.
 
-	//decimal_ram_address = hex_decimal(der);
+	convert_32_hex_address_to_string(hex_ram_address, address_as_string);
 
-	printf("%s\n", ram_address);
-	// Convert the hex string to base 16.
-	decimal_ram_address = strtol(der, NULL, 16);
-	printf("%ld\n", decimal_ram_address);   
+	dec_ram_address = strtol(address_as_string, NULL, 16);
+
+	snprintf(dec_address_as_string, 10, "%d", dec_ram_address);
+
+	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %d 4\n");
+
+	printf("%s\n", intent_to_write_to_ram_string);
+	
+	
+	// 3. Send intent-to-write string.
+	txString(intent_to_write_to_ram_string, 15, PRINT, 0);
+	Sleep(200);
+	rx(NO_PARSE, PRINT);
+
+	// 4. Send two pages of data: "DATA\n"
+	txString("$%`^H%P``", sizeof("$%`^H%P``"), PRINT, 5);
+	txString("\n", sizeof("\n"), PRINT, 0);
+	rx(NO_PARSE, PRINT);
+	//Sleep(300);
+	snprintf(checksum_as_string, 10, "%i", 226);
+
+	txString("226", sizeof("226"), PRINT, 0);
+	txString("\n", sizeof("\n"), PRINT, 0);
+	Sleep(300);
+	rx(NO_PARSE, PRINT);
+	
+	//txString("W 268435456 4\n", sizeof("W 268435456 4\n"), PRINT, 10);
+	//Sleep(200);
+	//rx(NO_PARSE, PRINT);
+	//txString("$%`^H%P`````````````````````\n", sizeof("$%`^H%P`````````````````````\n"), PRINT, 5);
+	//txString("226\n", sizeof("226\n"), PRINT, 5);
+	//Sleep(200);
+	//rx(NO_PARSE, PRINT);
 }
 
 
@@ -497,7 +528,7 @@ int uue_create_two_pages(uint8_t * uue_two_page_buffer, uint8_t * hex_data_array
 
 	// 3. Create checksum for encoded pages.
 	two_page_check_sum = check_sum(hex_data_array, 512, hex_data_array_check_sum);
-
+	hex_data_array_check_sum[0] = two_page_check_sum;
 	printf("\n\nTWO PAGE CHK SUM: %i\n", two_page_check_sum);
 	
 	// 4. Return checksum and UUEncoded array.
@@ -1072,25 +1103,7 @@ static uint8_t Ascii2Hex(uint8_t c)
 	return 0;  // this "return" will never be reached, but some compilers give a warning if it is not present
 } 
 
-int Hex2Int(uint8_t c)
-{
-	int first = c / 16 - 3;
-	int second = c % 16;
-	int result = first*10 + second;
-	//if(result > 9) result--;
-	return result;
-}
 
-int Hex2Ascii(uint8_t hexValue)
-{
-	uint8_t c = hexValue >>= 4;
-	hexValue <<= 4;
-	uint8_t d = hexValue >>= 4;
-
-	int high = Hex2Int(c) * 16;
-	int low = Hex2Int(d);
-	return high+low;
-}
 
 void clearSpecChar()
 {

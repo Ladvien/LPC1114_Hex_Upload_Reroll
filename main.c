@@ -50,7 +50,7 @@ static uint8_t Ascii2Hex(uint8_t c);
 
 //struct UUE_Data UUencode(struct hexFile hexFile);
 void clearBuffers();
-
+int tx_size(uint8_t * string);
 
 void setTextRed();
 void setTextGreen();
@@ -263,7 +263,7 @@ int main(int argc, uint8_t *argv[])
 	// DEBUG:
 		
 	// Convert hex data to UUE.
-	UUE_data_array_size = UUEncode(UUE_data_array, hex_data_array, hex_data_array_size);
+	//UUE_data_array_size = UUEncode(UUE_data_array, hex_data_array, hex_data_array_size);
 
 	// Write the UUE string to a file.  CURRENTLY BROKEN-ish.
 	writeUUEDataTofile(UUE_data_array, UUE_data_array_size);
@@ -275,7 +275,7 @@ int main(int argc, uint8_t *argv[])
 	{
 		for (int line_index = 0; line_index < 61; ++line_index)
 		{
-			printf("%C", uue_pages_or_scrap_array[i]);
+			//printf("%C", uue_pages_or_scrap_array[i]);
 			i++;
 		}
 		printf("\n");
@@ -528,61 +528,56 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 	printf("pages_or_scrap_check_sum %i\n", pages_or_scrap_check_sum);
 	printf("number_of_bytes_to_write %i\n", number_of_bytes_to_write);
 	printf("uue_pages_or_scrap_char_count %i\n", uue_pages_or_scrap_char_count);
-
-	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
+	
 	uint8_t address_as_string[9];
 	uint32_t hex_ram_address = 0;
 	long int dec_ram_address = 0;
 	uint8_t dec_address_as_string[32];
 	uint8_t intent_to_write_to_ram_string[128];
 	uint8_t checksum_as_string[64];
-
-
+	
 	hex_ram_address = 0x10000000; // Test address.
 
+	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
 	convert_32_hex_address_to_string(hex_ram_address, address_as_string);
-
 	dec_ram_address = strtol(address_as_string, NULL, 16);
-
-	snprintf(dec_address_as_string, 10, "%d", dec_ram_address);
+	snprintf(dec_address_as_string, sizeof(dec_address_as_string), "%d", dec_ram_address);
 
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
-	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %d 4\n");
-
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, number_of_bytes_to_write);
 	printf("%s\n", intent_to_write_to_ram_string);
-	
-	
+
+
 	// 3. Send intent-to-write string.
-	//txString(intent_to_write_to_ram_string, 14, PRINT, 0);
-	txString("W 268435456 4", 14, PRINT, 0);
+	txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
 	Sleep(400);
 	rx(NO_PARSE, PRINT);
 
 	// 4. Send two pages of data: "DATA\n"
-	txString("$%`^H%P``", sizeof("$%`^H%P``"), PRINT, 4);
-	//txString(uue_pages_or_scrap_array, 9, PRINT, 0);
+	//txString("$%`^H%P``", sizeof("$%`^H%P``"), PRINT, 4);
+	txString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+3, PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
 	rx(NO_PARSE, PRINT);
 	Sleep(300);
 
-	snprintf(checksum_as_string, 10, "%i", 226);
-
-	txString(checksum_as_string, 4, PRINT, 0);
+	// 5. Send checksum: "Chk_sum\n"
+	snprintf(checksum_as_string, 10, "%i\n", pages_or_scrap_check_sum);
+	txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
 	Sleep(600);
 	rx(NO_PARSE, PRINT);
-	
-	//txString("W 268435456 4\n", sizeof("W 268435456 4\n"), PRINT, 10);
-	//Sleep(200);
-	//rx(NO_PARSE, PRINT);
-	//txString("$%`^H%P`````````````````````\n", sizeof("$%`^H%P`````````````````````\n"), PRINT, 5);
-	//txString("226\n", sizeof("226\n"), PRINT, 5);
-	//Sleep(200);
-	//rx(NO_PARSE, PRINT);
+
 }
 
+int tx_size(uint8_t * string)
+{
+	int count_char_in_string = 0;
+	while(string[count_char_in_string] != '\n'){count_char_in_string++;}
+	count_char_in_string++;
 
+	return count_char_in_string;
+}
 ///////////// LPC Handling ///////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1267,6 +1262,7 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 		UUE_data_array[UUE_encoded_string_index] = 'M';
 
 	}
+	printf("%C ", UUE_data_array[UUE_encoded_string_index]);
 	UUE_encoded_string_index++;
 
 	
@@ -1309,6 +1305,8 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 			{
 				UUE_data_array[UUE_encoded_string_index] = (uue_char[i] + ' ');
 			}
+			printf("%C ", UUE_data_array[UUE_encoded_string_index]);
+
 			UUE_encoded_string_index++;
 		}
 
@@ -1322,12 +1320,18 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 			// 1. Add char for characters per line.
 			if(bytes_left < 45)
 			{
+				printf("HERE1 %i   %i \n", UUE_encoded_string_index, uue_length_char_index);
 				// Find how many characters are left.
-				UUE_data_array[UUE_encoded_string_index] = ((bytes_left << 2) >> 2) + ' ';	 
+				UUE_data_array[UUE_encoded_string_index] = ((bytes_left << 2) >> 2) + ' ';
+				printf("%C ", UUE_data_array[UUE_encoded_string_index]);
+				 
 			}
 			else
 			{
+				printf("HERE2 \n");
 				UUE_data_array[UUE_encoded_string_index] = 'M';
+				printf("%C ", UUE_data_array[UUE_encoded_string_index]);
+			
 			}	
 			UUE_encoded_string_index++;
 			uue_length_char_index = 45;

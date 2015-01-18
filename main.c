@@ -243,6 +243,15 @@ int main(int argc, uint8_t *argv[])
 	// Strange, this has to happen to get a response from the device.
 	FTDI_State_Machine(FTDI_SM_RESET, FT_ATTEMPTS);	 
 	
+	// Set RTS/CTS flow control
+	FT_status = FT_SetFlowControl(handle, FT_FLOW_XON_XOFF, 0x11, 0x13);
+	if (FT_status == FT_OK) {
+		// FT_SetFlowControl OK
+	}
+	else {
+		// FT_SetFlowControl Failed
+	}
+
 	//Set up pins we will use.
 	//FT_SetBitMode(handle, PIN_DTR | PIN_CTS, 1);
 	//Setup serial port, even though we are banging.
@@ -312,51 +321,6 @@ int main(int argc, uint8_t *argv[])
 	ram_address[4] = '\n';
 
 	write_two_pages_to_ram(uue_pages_or_scrap_array, ram_address, uue_pages_or_scrap_char_count, pages_or_scrap_check_sum, number_of_bytes_to_write, hex_data_array_size);
-	/*
-	// DEBUG NOTES:
-	// It seems the hexFile.original_data_checksum printed from the hexRead function
-	// does not equal what it does from the main function.
-	char write_to_ram_string[64];
-	
-	// Turn UUE string size into ASCII.
-	char tx_byte_count[64];
-	
-	//itoa(UUE_Data.UUE_Encoded_String_Index, tx_byte_count);
-	sprintf(tx_byte_count, "%i", hexFile.fileData_Hex_String_Size);
-
-	// Turn hex data checksum into ASCII.
-	char tx_check_sum[64];
-	sprintf(tx_check_sum, "%i", (hexFile.original_data_checksum[0]));
-	
-	printf("orig-d-check %i\n", hexFile.original_data_checksum);
-	printf("tx_check_sum %s\n", tx_check_sum);
-	printf("BYTE COUNT: %c\n", tx_byte_count[0]);
-
-	sprintf(write_to_ram_string, "W 268436224 %c\n", tx_byte_count[0]);
-	// Write memory
-	txString(write_to_ram_string, sizeof(write_to_ram_string), PRINT, 5);
-	Sleep(300);
-	rx(PARSE, PRINT);
-	Sleep(100);
-	txString(UUE_Data.UUE_Encoded_String, UUE_Data.UUE_Encoded_String_Index, PRINT, 0); // Send UUE data
-	txString("\n", sizeof("\n"), PRINT, 0); // End UUE data
-	txString(tx_check_sum, sizeof(tx_check_sum), PRINT, 0); // Send hex data checksum.
-	txString("\n", sizeof("\n"), PRINT, 0); // End checksum.
-
-	Sleep(500);
-	rx(PARSE, PRINT);
-
-	//txString(hexFile.fileData_Hex_String, hexFile.fileData_Hex_String_Size, PRINT, 0);
-	//rx(NO_PARSE, PRINT);
-	//txString("226\n", sizeof("226\n"), PRINT, 0);
-	//Sleep(120);
-	//rx(NO_PARSE, PRINT);
-
-	
-	
-*/
-
-
 
 	/*
 	// Read memory
@@ -366,24 +330,6 @@ int main(int argc, uint8_t *argv[])
 	txString("OK\n", sizeof("OK\n"), PRINT, 0);
 	Sleep(500);
 	rx(PARSE, PRINT);
-
-
-		// Write memory
-		txString("W 268436224 8\n", sizeof("W 268436224 8\n"), 0);
-		Sleep(500);
-		rx(NO000, rxString);
-
-		txString("(5&AE(&-A<@\n403\n", sizeof("(5&AE(&-A<@\n403\n"), 0);
-		
-		// TEST
-		// HEX: 54 68 65 20 63 61 72
-		// DECL 84  104 101 32 99 97
-		// UUE: 5&AE(&-A
-
-		printf("THIS NUMBER: %i\n", "RESEND");
-
-		Sleep(500);
-		rx(NO000, rxString);
 
 	// Read memory
 	txString("R 268436224 4\n", sizeof("R 268436224 4\n"), 0);
@@ -438,6 +384,11 @@ int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_
 		for (int i = 0; i < hex_data_array_size; ++i)
 		{
 			hex_two_page_array[i] = hex_data_array[i];
+		}
+
+		while(!(hex_data_array_size % 4 == 0))
+		{
+			hex_data_array_size++;
 		}
 
 		*number_of_bytes_to_write = hex_data_array_size;
@@ -556,10 +507,13 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 
 	// 4. Send two pages of data: "DATA\n"
 	txString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, 0);
+	Sleep(500);
+	
 	txString("\n", sizeof("\n"), PRINT, 0);
-	Sleep(600);
+	Sleep(900);
 	rx(NO_PARSE, PRINT);
 	
+	//FT_Purge(handle, FT_PURGE_RX);
 
 	// 5. Send checksum: "Chk_sum\n"
 	snprintf(checksum_as_string, 10, "%i\n", pages_or_scrap_check_sum);
@@ -1339,6 +1293,14 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 		}
 
 	} // End UUE loop	
+
+	while(!(UUE_encoded_string_index % 4 == 0))
+	{
+		printf("HERE 14\n");
+		UUE_data_array[UUE_encoded_string_index] = '`';
+		UUE_encoded_string_index++;
+	}
+
 
 	// Return count of UUE chars.
 	return UUE_encoded_string_index;

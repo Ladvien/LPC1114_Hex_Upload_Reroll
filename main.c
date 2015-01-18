@@ -128,8 +128,8 @@ DWORD TxBytes;
 DWORD bytes;
 DWORD RxBytes;
 DWORD BytesReceived;
-uint8_t RawRxBuffer[256];
-uint8_t ParsedRxBuffer[256];
+uint8_t RawRxBuffer[2048];
+uint8_t ParsedRxBuffer[2048];
 
 //File to be loaded.	
 FILE *fileIn;
@@ -555,17 +555,17 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 	rx(NO_PARSE, PRINT);
 
 	// 4. Send two pages of data: "DATA\n"
-	//txString("$%`^H%P``", sizeof("$%`^H%P``"), PRINT, 4);
-	txString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+3, PRINT, 0);
+	txString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
+	Sleep(600);
 	rx(NO_PARSE, PRINT);
-	Sleep(300);
+	
 
 	// 5. Send checksum: "Chk_sum\n"
 	snprintf(checksum_as_string, 10, "%i\n", pages_or_scrap_check_sum);
 	txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
-	Sleep(600);
+	Sleep(200);
 	rx(NO_PARSE, PRINT);
 
 }
@@ -1312,19 +1312,20 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 
 		// Data bytes left.
 		bytes_left = (hex_data_array_size + (hex_data_array_index*-1));
-
+		 
 		if (uue_length_char_index == 0)
 		{
 			// NOTE: Could be simplified to include first char
 			// and additional characters, using a positive index.
 			// 1. Add char for characters per line.
+			UUE_data_array[UUE_encoded_string_index] = '\n';
+			UUE_encoded_string_index++;
+			printf("bytes_left %i\n", bytes_left);
 			if(bytes_left < 45)
 			{
 				printf("HERE1 %i   %i \n", UUE_encoded_string_index, uue_length_char_index);
 				// Find how many characters are left.
-				UUE_data_array[UUE_encoded_string_index] = ((bytes_left << 2) >> 2) + ' ';
-				printf("%C ", UUE_data_array[UUE_encoded_string_index]);
-				 
+				UUE_data_array[UUE_encoded_string_index] = ((bytes_left & 0x3f) + ' ');
 			}
 			else
 			{

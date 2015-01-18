@@ -1333,7 +1333,7 @@ void startScreen()
 	printf("\n");
 	printf("\n");
 	printf("**************************************************************************\n");
-	printf("**** Mutant LPC1114 Downloader v.76                                  *****\n");
+	printf("**** Mutant LPC1114 Downloader v.96                                  *****\n");
 	printf("**** Hacked Out with Little Thought                                  *****\n");
 	printf("****                                   Thanks to Bdk6                *****\n");
 	printf("****                            His help was more than invaluable,   *****\n");

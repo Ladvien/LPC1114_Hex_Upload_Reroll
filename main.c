@@ -67,6 +67,8 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 
 int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_data_array, int hex_data_array_size, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written);
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
+
+uint8_t ft_write_chunk(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
 //////////////////// Variables and Defines ////////////////////////////////////////////////////////
 
 //#define PIN_TX  0x01  /* Orange wire on FTDI cable */
@@ -294,18 +296,14 @@ int main(int argc, uint8_t *argv[])
 	ram_address[3] = 0x00;
 	ram_address[4] = '\n';
 
-	// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
-	uue_pages_or_scrap_char_count = uue_create_pages_or_scrap(uue_pages_or_scrap_array, hex_data_array, hex_data_array_size, &pages_or_scrap_check_sum, &number_of_bytes_to_write, &bytes_written);
-
-	//write_two_pages_to_ram(uue_pages_or_scrap_array, ram_address, uue_pages_or_scrap_char_count, pages_or_scrap_check_sum, number_of_bytes_to_write, hex_data_array_size, &bytes_written);
-	Sleep(200);
-
 	while(bytes_written < hex_data_array_size)
 	{
+		Sleep(300);
 		// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
 		uue_pages_or_scrap_char_count = uue_create_pages_or_scrap(uue_pages_or_scrap_array, hex_data_array, hex_data_array_size, &pages_or_scrap_check_sum, &number_of_bytes_to_write, &bytes_written);
-
+		Sleep(300);
 		write_two_pages_to_ram(uue_pages_or_scrap_array, ram_address, uue_pages_or_scrap_char_count, pages_or_scrap_check_sum, number_of_bytes_to_write, hex_data_array_size, &bytes_written);
+		Sleep(300);
 	}
 	
 
@@ -351,24 +349,29 @@ int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_
 	int uue_pages_or_scrap_char_count = 0;
 	uint8_t hex_two_page_array[2048];
 	int count = 0;
-	int bytes_left_to_write = (hex_data_array_size - *bytes_written);
+	static int load_data_index;
+	int buffer_index = 0;
 
-	if (hex_data_array_size < 512 || bytes_left_to_write > 0)
+	// Bytes note yet written to RAM.
+	int bytes_left_to_write = (hex_data_array_size - *bytes_written);
+	printf("bytes_left_to_write %i\n", bytes_left_to_write);
+	if (bytes_left_to_write < 128)
 	{
 		// Get scrap.
-		
-		// 1. Get 512 bytes of hex data (two pages).
-		for (int i = 0; i < hex_data_array_size; ++i)
+
+		while(buffer_index != bytes_left_to_write)
 		{
-			hex_two_page_array[i] = hex_data_array[i];
+			hex_two_page_array[buffer_index] = hex_data_array[load_data_index];
+			load_data_index++;
+			buffer_index++;
 		}
 
-		*number_of_bytes_to_write = hex_data_array_size;
+		*number_of_bytes_to_write = buffer_index;
 		// 2. Create UUEncode array from hex pages.
-		uue_pages_or_scrap_char_count = UUEncode(uue_pages_or_scrap_array, hex_two_page_array, hex_data_array_size);
+		uue_pages_or_scrap_char_count = UUEncode(uue_pages_or_scrap_array, hex_two_page_array, buffer_index);
 
 		// 3. Create checksum for encoded pages.
-		*pages_or_scrap_check_sum = check_sum(hex_data_array, hex_data_array_size);
+		*pages_or_scrap_check_sum = check_sum(hex_two_page_array, buffer_index);
 
 		// 4. Return checksum and UUEncoded array.
 	}
@@ -377,17 +380,19 @@ int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_
 		// Get two pages.
 		
 		// 1. Get 512 bytes of hex data (two pages).
-		for (int i = 0; i < 512; ++i)
+		while(buffer_index != 128)
 		{
-			hex_two_page_array[i] = hex_data_array[i];
+			hex_two_page_array[buffer_index] = hex_data_array[load_data_index];
+			load_data_index++;
+			buffer_index++;
 		}
 
-		*number_of_bytes_to_write = 512;
+		*number_of_bytes_to_write = 128;
 		// 2. Create UUEncode array from hex pages.
-		uue_pages_or_scrap_char_count = UUEncode(uue_pages_or_scrap_array, hex_two_page_array, 512);
+		uue_pages_or_scrap_char_count = UUEncode(uue_pages_or_scrap_array, hex_two_page_array, 128);
 
 		// 3. Create checksum for encoded pages.
-		*pages_or_scrap_check_sum = check_sum(hex_data_array, 512);
+		*pages_or_scrap_check_sum = check_sum(hex_two_page_array, 128);
 
 		// 4. Return checksum and UUEncoded array.
 	}
@@ -445,10 +450,10 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 	// 8. Repeat write if necessary.
 	// 9. Return true if successful (combine step 9?)
 
-	printf("hex_data_array_size %i\n", hex_data_array_size);
-	printf("pages_or_scrap_check_sum %i\n", pages_or_scrap_check_sum);
-	printf("number_of_bytes_to_write %i\n", number_of_bytes_to_write);
-	printf("uue_pages_or_scrap_char_count %i\n", uue_pages_or_scrap_char_count);
+	//printf("hex_data_array_size %i\n", hex_data_array_size);
+	//printf("pages_or_scrap_check_sum %i\n", pages_or_scrap_check_sum);
+	//printf("number_of_bytes_to_write %i\n", number_of_bytes_to_write);
+	//printf("uue_pages_or_scrap_char_count %i\n", uue_pages_or_scrap_char_count);
 	
 	uint8_t address_as_string[9];
 	uint32_t hex_ram_address = 0;
@@ -474,18 +479,19 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 	rx(PARSE, PRINT);
 
 	// 4. Send two pages of data: "DATA\n"
-	txString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, 0);
+	//txString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, 0);
 	//Sleep(200);
-	
-	txString("\n", sizeof("\n"), PRINT, 0);
-	Sleep(300);
+	ft_write_chunk(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, 0);
+
+	//txString("\n", sizeof("\n"), PRINT, 0);
+	Sleep(400);
 	rx(NO_PARSE, PRINT);
 
 	// 5. Send checksum: "Chk_sum\n"
 	snprintf(checksum_as_string, 10, "%i\n", pages_or_scrap_check_sum);
 	txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
-	Sleep(120);
+	Sleep(420);
 	rx(NO_PARSE, PRINT);
 
 
@@ -937,6 +943,22 @@ void clearBuffers()
 	}
 }
 
+uint8_t ft_write_chunk(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char)
+{
+	uint8_t FTWrite_Check;
+
+	string[txString_size+1] = '\n';
+	FTWrite_Check = FT_Write(handle, &string, (DWORD)sizeof(string), &bytes);
+	printf("%i\n", bytes);
+	Sleep(200);
+	printf("%i\n", bytes);
+	//while(bytes < txString_size){Sleep(20);}
+	if(printOrNot)
+	{
+		setTextRed();
+		printf("%s", string);
+	}
+}
 
 uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char)
 {

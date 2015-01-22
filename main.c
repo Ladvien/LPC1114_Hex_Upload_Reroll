@@ -67,8 +67,6 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 
 int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_data_array, int hex_data_array_size, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written);
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
-
-uint8_t ft_write_chunk(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
 //////////////////// Variables and Defines ////////////////////////////////////////////////////////
 
 //#define PIN_TX  0x01  /* Orange wire on FTDI cable */
@@ -127,11 +125,14 @@ FT_HANDLE handle = NULL;
 FT_STATUS FT_status;
 DWORD EventDWord;
 DWORD TxBytes;
-DWORD bytes;
+DWORD BytesWritten;
 DWORD RxBytes;
 DWORD BytesReceived;
 uint8_t RawRxBuffer[2048];
 uint8_t ParsedRxBuffer[2048];
+
+DWORD * ptr_bytes_written = &BytesWritten;
+
 
 //File to be loaded.	
 FILE *fileIn;
@@ -244,7 +245,7 @@ int main(int argc, uint8_t *argv[])
 	FTDI_State_Machine(FTDI_SM_OPEN, FT_ATTEMPTS);
 
 	// Strange, this has to happen to get a response from the device.
-	FTDI_State_Machine(FTDI_SM_RESET, FT_ATTEMPTS);	 
+	FTDI_State_Machine(FTDI_SM_RESET, FT_ATTEMPTS);	
 
 	//Set up pins we will use.
 	//FT_SetBitMode(handle, PIN_DTR | PIN_CTS, 1);
@@ -298,12 +299,11 @@ int main(int argc, uint8_t *argv[])
 
 	while(bytes_written < hex_data_array_size)
 	{
-		Sleep(300);
 		// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
 		uue_pages_or_scrap_char_count = uue_create_pages_or_scrap(uue_pages_or_scrap_array, hex_data_array, hex_data_array_size, &pages_or_scrap_check_sum, &number_of_bytes_to_write, &bytes_written);
-		Sleep(300);
+		Sleep(100);
 		write_two_pages_to_ram(uue_pages_or_scrap_array, ram_address, uue_pages_or_scrap_char_count, pages_or_scrap_check_sum, number_of_bytes_to_write, hex_data_array_size, &bytes_written);
-		Sleep(300);
+		Sleep(150);
 	}
 	
 
@@ -354,6 +354,7 @@ int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_
 
 	// Bytes note yet written to RAM.
 	int bytes_left_to_write = (hex_data_array_size - *bytes_written);
+
 	printf("bytes_left_to_write %i\n", bytes_left_to_write);
 	if (bytes_left_to_write < 128)
 	{
@@ -461,7 +462,7 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 	uint8_t dec_address_as_string[32];
 	uint8_t intent_to_write_to_ram_string[128];
 	uint8_t checksum_as_string[64];
-	
+	int test = 0;
 	hex_ram_address = 0x10000000; // Test address.
 
 	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
@@ -472,31 +473,41 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
 	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, number_of_bytes_to_write);
 
-	// 3. Send intent-to-write string.
-	txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), PRINT, 0);
-	txString("\n", sizeof("\n"), PRINT, 0);
-	Sleep(100);
-	rx(PARSE, PRINT);
+	while(test < 3){
+		// 3. Send intent-to-write string.
+		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), PRINT, 0);
+		txString("\n", sizeof("\n"), PRINT, 0);
+		Sleep(100);
+		rx(PARSE, PRINT);
 
-	// 4. Send two pages of data: "DATA\n"
-	//txString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, 0);
-	//Sleep(200);
-	ft_write_chunk(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, 0);
+		// 4. Send two pages of data: "DATA\n"
+		txString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, 0);
+		//Sleep(200);
+		
+		txString("\n", sizeof("\n"), PRINT, 0);
+		Sleep(100);
+		rx(NO_PARSE, PRINT);
 
-	//txString("\n", sizeof("\n"), PRINT, 0);
-	Sleep(400);
-	rx(NO_PARSE, PRINT);
+		// 5. Send checksum: "Chk_sum\n"
+		snprintf(checksum_as_string, 10, "%i\n", pages_or_scrap_check_sum);
+		txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
+		txString("\n", sizeof("\n"), PRINT, 0);
+		Sleep(120);
 
-	// 5. Send checksum: "Chk_sum\n"
-	snprintf(checksum_as_string, 10, "%i\n", pages_or_scrap_check_sum);
-	txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
-	txString("\n", sizeof("\n"), PRINT, 0);
-	Sleep(420);
-	rx(NO_PARSE, PRINT);
+		printf("test %i\n", test);
+		test = rx(PARSE, PRINT);
+		printf("test %i\n", test);
+	}
 
 
-	// All count data written on a successful write_to_ram.
-	*bytes_written += number_of_bytes_to_write;
+
+	if (test == 3)
+	{
+		// All count data written on a successful write_to_ram.
+		*bytes_written += number_of_bytes_to_write;
+	}
+
+
 }
 
 int tx_size(uint8_t * string)
@@ -846,7 +857,7 @@ uint8_t rx(bool parse, bool printOrNot)
 				clearBuffers();
 			}
 	
-			if(device_and_success > 0){return 1;}
+			if(device_and_success > 0){return device_and_success;}
 
 		}
 		else {
@@ -868,6 +879,7 @@ uint8_t parserx()
 		// Does the RawRxBuffer contain an CR LF string?
 		uint8_t *CR_LF_CHK = strstr(RawRxBuffer, "\r\n");
 		uint8_t *LF_CHK = strstr(RawRxBuffer, "\n");
+		uint8_t *OK_RES_LPC = strstr(RawRxBuffer, "OK");
 
 		uint8_t command_response_bfr[2];
 
@@ -913,6 +925,14 @@ uint8_t parserx()
 			// HM-10 responded.
 			successful=2;
 		}
+		// Is it a command response from LPC?
+		if (OK_RES_LPC != '\0')
+		{
+			strcpy(ParsedRxBuffer, RawRxBuffer);
+			// HM-10 responded.
+			successful=3;
+		}
+
 		// If the RawRxBuffer data does not contain "\r\n" or "OK+" strings.
 		else
 		{
@@ -943,32 +963,19 @@ void clearBuffers()
 	}
 }
 
-uint8_t ft_write_chunk(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char)
-{
-	uint8_t FTWrite_Check;
-
-	string[txString_size+1] = '\n';
-	FTWrite_Check = FT_Write(handle, &string, (DWORD)sizeof(string), &bytes);
-	printf("%i\n", bytes);
-	Sleep(200);
-	printf("%i\n", bytes);
-	//while(bytes < txString_size){Sleep(20);}
-	if(printOrNot)
-	{
-		setTextRed();
-		printf("%s", string);
-	}
-}
 
 uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char)
 {
-
 	uint8_t FTWrite_Check;
 
 	for (int i = 0; i < (txString_size-1); i++){
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
-		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), &bytes);
+		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
 		Sleep(frequency_of_tx_char);
+
+		while((txString_size) < *ptr_bytes_written){Sleep(1000);}
+		
+		FT_Purge(handle, FT_PURGE_RX | FT_PURGE_TX); 
 		if(printOrNot)
 		{
 			setTextRed();

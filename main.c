@@ -14,6 +14,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "ftd2xx.h"
+#include <time.h>
 
 //////////////////// Forward Declaration ////////////////////////////////////////////////////////////
 
@@ -26,6 +27,7 @@ static FILE *open_file ( char *file, char *mode );
 int fileSizer();
 uint8_t rx(bool parse, bool printOrNot);
 uint8_t parserx();
+uint8_t utxString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
 uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
 int FTDI_State_Machine(int state, int FT_Attempts);
 uint8_t get_LPC_Info(bool print);
@@ -63,7 +65,7 @@ void Failed();
 void check_HM_10();
 void wake_devices();
 
-int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written);
+int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint32_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written);
 
 int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_data_array, int hex_data_array_size, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written);
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
@@ -290,20 +292,17 @@ int main(int argc, uint8_t *argv[])
 	Sleep(500);
 	rx(PARSE, PRINT);
 	
-	uint8_t ram_address[5];
-	ram_address[0] = 0x10;
-	ram_address[1] = 0x00;
-	ram_address[2] = 0x00;
-	ram_address[3] = 0x00;
-	ram_address[4] = '\n';
+	// ISP uses RAM from 0x1000 017C to 0x1000 17F
+	uint32_t ram_address = 0x1000017C;
+
 
 	while(bytes_written < hex_data_array_size)
 	{
 		// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
 		uue_pages_or_scrap_char_count = uue_create_pages_or_scrap(uue_pages_or_scrap_array, hex_data_array, hex_data_array_size, &pages_or_scrap_check_sum, &number_of_bytes_to_write, &bytes_written);
-		Sleep(100);
-		write_two_pages_to_ram(uue_pages_or_scrap_array, ram_address, uue_pages_or_scrap_char_count, pages_or_scrap_check_sum, number_of_bytes_to_write, hex_data_array_size, &bytes_written);
-		Sleep(150);
+		//Sleep(10);
+		write_two_pages_to_ram(uue_pages_or_scrap_array, &ram_address, uue_pages_or_scrap_char_count, pages_or_scrap_check_sum, number_of_bytes_to_write, hex_data_array_size, &bytes_written);
+		//Sleep(150);
 	}
 	
 
@@ -439,7 +438,20 @@ void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_str
 	}
 }
 
-int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written)
+void usleep(__int64 usec) 
+{ 
+    HANDLE timer; 
+    LARGE_INTEGER ft; 
+
+    ft.QuadPart = -(10*usec); // Convert to 100 nanosecond interval, negative value indicates relative time
+
+    timer = CreateWaitableTimer(NULL, TRUE, NULL); 
+    SetWaitableTimer(timer, &ft, 0, NULL, NULL, 0); 
+    WaitForSingleObject(timer, INFINITE); 
+    CloseHandle(timer); 
+}
+
+int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint32_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written)
 {
 	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
@@ -460,20 +472,24 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 	uint32_t hex_ram_address = 0;
 	long int dec_ram_address = 0;
 	uint8_t dec_address_as_string[32];
-	uint8_t intent_to_write_to_ram_string[128];
+	uint8_t intent_to_write_to_ram_string[512];
 	uint8_t checksum_as_string[64];
-	int test = 0;
-	hex_ram_address = 0x10000000; // Test address.
+	int successful = 0;
+
+	int slow_down = 0;
+
+	static int write_success = 0, write_attempt = 0;
+	float success_ratio = 0;
 
 	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
-	convert_32_hex_address_to_string(hex_ram_address, address_as_string);
+	convert_32_hex_address_to_string(*ram_address, address_as_string);
 	dec_ram_address = strtol(address_as_string, NULL, 16);
 	snprintf(dec_address_as_string, sizeof(dec_address_as_string), "%d", dec_ram_address);
 
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
 	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, number_of_bytes_to_write);
 
-	while(test < 3){
+	while(successful < 3){
 		// 3. Send intent-to-write string.
 		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), PRINT, 0);
 		txString("\n", sizeof("\n"), PRINT, 0);
@@ -481,34 +497,45 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint8_t * ram_add
 		rx(PARSE, PRINT);
 
 		// 4. Send two pages of data: "DATA\n"
-		txString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, 0);
+		utxString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, slow_down);
 		//Sleep(200);
 		
 		txString("\n", sizeof("\n"), PRINT, 0);
-		Sleep(100);
+		Sleep(120);
 		rx(NO_PARSE, PRINT);
 
 		// 5. Send checksum: "Chk_sum\n"
 		snprintf(checksum_as_string, 10, "%i\n", pages_or_scrap_check_sum);
 		txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
 		txString("\n", sizeof("\n"), PRINT, 0);
-		Sleep(120);
+		Sleep(110);
 
-		printf("test %i\n", test);
-		test = rx(PARSE, PRINT);
-		printf("test %i\n", test);
+		successful = rx(PARSE, PRINT);
+		
+		write_attempt++;
+
+		// Slow things down, in case the write doesn't work and we go again.
+		slow_down++;
 	}
-
-
-
-	if (test == 3)
+	if (successful == 3)
 	{
+		// No need to slow down.
+		slow_down = 0;
+
+		//Success counter.
+		write_success++;
+
 		// All count data written on a successful write_to_ram.
 		*bytes_written += number_of_bytes_to_write;
 	}
 
+	// Calculates the success rate of write_to_ram()
+	success_ratio = ((float)write_success / write_attempt) * 100;
+	printf("Write to RAM success: %%%.2f\n", success_ratio);
 
 }
+
+
 
 int tx_size(uint8_t * string)
 {
@@ -963,6 +990,26 @@ void clearBuffers()
 	}
 }
 
+uint8_t utxString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char)
+{
+	uint8_t FTWrite_Check;
+
+	for (int i = 0; i < (txString_size-1); i++){
+		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
+		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
+		usleep(frequency_of_tx_char);
+
+		while((txString_size) < *ptr_bytes_written){Sleep(1000);}
+		
+		FT_Purge(handle, FT_PURGE_RX | FT_PURGE_TX); 
+		if(printOrNot)
+		{
+			setTextRed();
+			printf("%C", string[i]);
+		}
+	}	
+	clearConsole();
+}
 
 uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char)
 {

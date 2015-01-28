@@ -152,19 +152,27 @@ int command_response_code = 0;
 struct write_to_RAM
 {
 	// Holds the raw hex data, straight from the file.
-	uint8_t data_array[MAX_SIZE];
 	uint8_t data_to_write[7][1024];	
 	int data_to_write_check_sum[7];
 	int bytes_written;
 	int number_of_bytes_to_write[7];
+	int UUE_char_count;
 };
-
-struct UUE
+//uue_pages_or_scrap_array, 
+// data.HEX_array, 
+// data.HEX_array_size, 
+// &pages_or_scrap_check_sum, 
+// &number_of_bytes_to_write, 
+//&bytes_written);
+struct data
 {
 	// Holds the raw hex data, straight from the file.
-	uint8_t data_array[MAX_SIZE];
-	int data_array_size;
-	int data_to_write_char_count[7];
+	uint8_t HEX_array[MAX_SIZE];
+	uint8_t UUE_array[43691]; // MAX_SIZE / .75
+
+	int HEX_array_size;
+	int UUE_array_size;
+
 };
 
 // States for FTDI state machine.
@@ -242,7 +250,10 @@ int main(int argc, uint8_t *argv[])
 	int pages_or_scrap_check_sum = 0;
 	int bytes_written = 0;
 
-	struct UUE UUE;
+	struct data data;
+	struct write_to_RAM write_to_RAM;
+
+
 
 	// Local for FTDI State Machine.
 	//FTDI_state FTDI_Operation = RX_CLOSE;
@@ -271,13 +282,13 @@ int main(int argc, uint8_t *argv[])
 	fileSize = fileSizer();
 
 	// Load the data from file
-	hex_data_array_size = hex_file_to_array(hex_data_array, fileSize);
+	data.HEX_array_size = hex_file_to_array(data.HEX_array, fileSize);
 	
 	// Write hex string back to a file.  Used for debugging.
-	writeHexDataTofile(hex_data_array, hex_data_array_size);
+	writeHexDataTofile(data.HEX_array, data.HEX_array_size);
 	
 	// Write the UUE string to a file.  CURRENTLY BROKEN-ish.
-	writeUUEDataTofile(UUE_data_array, UUE_data_array_size);
+	writeUUEDataTofile(data.UUE_array, data.UUE_array_size);
 	
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	wake_devices();
@@ -307,10 +318,10 @@ int main(int argc, uint8_t *argv[])
 	// ISP uses RAM from 0x1000 017C to 0x1000 17F
 	uint32_t ram_address = 0x1000017C;
 
-	while(bytes_written < hex_data_array_size)
+	while(bytes_written < data.HEX_array_size)
 	{
 		// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
-		uue_pages_or_scrap_char_count = uue_create_pages_or_scrap(uue_pages_or_scrap_array, hex_data_array, hex_data_array_size, &pages_or_scrap_check_sum, &number_of_bytes_to_write, &bytes_written);
+		uue_pages_or_scrap_char_count = uue_create_pages_or_scrap(uue_pages_or_scrap_array, data.HEX_array, data.HEX_array_size, &pages_or_scrap_check_sum, &number_of_bytes_to_write, &bytes_written);
 		write_two_pages_to_ram(uue_pages_or_scrap_array, &ram_address, uue_pages_or_scrap_char_count, pages_or_scrap_check_sum, number_of_bytes_to_write, hex_data_array_size, &bytes_written);
 	}
 

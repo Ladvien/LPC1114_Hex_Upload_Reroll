@@ -16,59 +16,6 @@
 #include "ftd2xx.h"
 #include <sys/time.h>
 
-//////////////////// Forward Declaration ////////////////////////////////////////////////////////////
-
-// FTDI
-uint8_t rx(bool parse, bool printOrNot);
-uint8_t parserx();
-uint8_t utxString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
-uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
-int FTDI_State_Machine(int state, int FT_Attempts);
-
-// Output files, for debugging purposes.
-void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int hexDataCharCount);
-void writeHexDataTofile(uint8_t * fileData_Hex_String, int hexDataCharCount);
-static FILE *open_file ( char *file, char *mode );
-int fileSizer();
-
-// LPC handling
-uint8_t set_ISP_mode(int print);
-uint8_t get_LPC_Info(bool print);
-void command_response();
-void OK();
-void Failed();
-
-// HM-11 commands
-void wake_devices();
-void check_HM_10();
-
-
-// Data Handling
-int hex_file_to_array(uint8_t * hex_data_array, int file_size);
-int check_sum(uint8_t * hex_data_array, int file_size);
-int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_array_size);
-uint8_t readByte();
-void clearSpecChar();
-static uint8_t Ascii2Hex(uint8_t c);
-void copy_string(uint8_t *target, uint8_t *source);
-int tx_size(uint8_t * string);
-
-// Debugging and Print Handling.
-void clearBuffers();
-void setTextRed();
-void setTextGreen();
-void setColor(int ForgC, int BackC);
-void clearConsole();
-void startScreen();
-
-// Write to RAM.
-int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint32_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written);
-int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_data_array, int hex_data_array_size, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written);
-void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
-
-// Timers
-float timer();
-void usleep(__int64 usec);
 
 //////////////////// Variables and Defines ////////////////////////////////////////////////////////
 
@@ -149,7 +96,7 @@ int totalCharsRead = 0;
 
 int command_response_code = 0;
 
-struct write_to_RAM
+struct Write_to_RAM
 {
 	// Holds the raw hex data, straight from the file.
 	uint8_t data_to_write[7][1024];	
@@ -164,10 +111,10 @@ struct write_to_RAM
 // &pages_or_scrap_check_sum, 
 // &number_of_bytes_to_write, 
 //&bytes_written);
-struct data
+struct Data
 {
 	// Holds the raw hex data, straight from the file.
-	uint8_t HEX_array[MAX_SIZE];
+	uint8_t HEX_array[32768];
 	uint8_t UUE_array[43691]; // MAX_SIZE / .75
 
 	int HEX_array_size;
@@ -216,7 +163,60 @@ typedef enum {
 	RX_ERROR,
 } RX_state;
 
+//////////////////// Forward Declaration ////////////////////////////////////////////////////////////
 
+// FTDI
+uint8_t rx(bool parse, bool printOrNot);
+uint8_t parserx();
+uint8_t utxString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
+uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
+int FTDI_State_Machine(int state, int FT_Attempts);
+
+// Output files, for debugging purposes.
+void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int hexDataCharCount);
+void writeHexDataTofile(struct Data data_local);
+static FILE *open_file ( char *file, char *mode );
+int fileSizer();
+
+// LPC handling
+uint8_t set_ISP_mode(int print);
+uint8_t get_LPC_Info(bool print);
+void command_response();
+void OK();
+void Failed();
+
+// HM-11 commands
+void wake_devices();
+void check_HM_10();
+
+
+// Data Handling
+
+struct Data hex_file_to_array(struct Data data_local, int file_size);
+int check_sum(uint8_t * hex_data_array, int file_size);
+int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_array_size);
+uint8_t readByte();
+void clearSpecChar();
+static uint8_t Ascii2Hex(uint8_t c);
+void copy_string(uint8_t *target, uint8_t *source);
+int tx_size(uint8_t * string);
+
+// Debugging and Print Handling.
+void clearBuffers();
+void setTextRed();
+void setTextGreen();
+void setColor(int ForgC, int BackC);
+void clearConsole();
+void startScreen();
+
+// Write to RAM.
+int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint32_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written);
+int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_data_array, int hex_data_array_size, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written);
+void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
+
+// Timers
+float timer();
+void usleep(__int64 usec);
 
 
 
@@ -250,10 +250,8 @@ int main(int argc, uint8_t *argv[])
 	int pages_or_scrap_check_sum = 0;
 	int bytes_written = 0;
 
-	struct data data;
-	struct write_to_RAM write_to_RAM;
-
-
+	struct Data data;
+	struct Write_to_RAM write_to_RAM;
 
 	// Local for FTDI State Machine.
 	//FTDI_state FTDI_Operation = RX_CLOSE;
@@ -282,13 +280,15 @@ int main(int argc, uint8_t *argv[])
 	fileSize = fileSizer();
 
 	// Load the data from file
-	data.HEX_array_size = hex_file_to_array(data.HEX_array, fileSize);
+	data = hex_file_to_array(data, fileSize);
 	
 	// Write hex string back to a file.  Used for debugging.
-	writeHexDataTofile(data.HEX_array, data.HEX_array_size);
+	writeHexDataTofile(data);
 	
 	// Write the UUE string to a file.  CURRENTLY BROKEN-ish.
-	writeUUEDataTofile(data.UUE_array, data.UUE_array_size);
+	// UPDATE: I hope to re-write this when I begin writing to RAM
+	// using a 2d array.
+	//writeUUEDataTofile(data.UUE_array, data.UUE_array_size);
 	
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	wake_devices();
@@ -312,7 +312,7 @@ int main(int argc, uint8_t *argv[])
 	
 	// Send Unlock Code
 	txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
-	Sleep(500);
+	Sleep(120);
 	rx(PARSE, PRINT);
 	
 	// ISP uses RAM from 0x1000 017C to 0x1000 17F
@@ -495,8 +495,7 @@ uint8_t utxString(uint8_t string[], int txString_size, bool printOrNot, int freq
 		usleep(frequency_of_tx_char);
 
 		while((txString_size) < *ptr_bytes_written){Sleep(1000);}
-		
-		FT_Purge(handle, FT_PURGE_RX | FT_PURGE_TX); 
+		 
 		if(printOrNot)
 		{
 			setTextRed();
@@ -517,7 +516,6 @@ uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequ
 
 		while((txString_size) < *ptr_bytes_written){Sleep(1000);}
 		
-		FT_Purge(handle, FT_PURGE_RX | FT_PURGE_TX); 
 		if(printOrNot)
 		{
 			setTextRed();
@@ -625,8 +623,9 @@ void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int UUE_Encoded_String_Ind
 	}
 }
 
-void writeHexDataTofile(uint8_t * fileData_Hex_String, int hexDataCharCount)
+void writeHexDataTofile(struct Data data_local)
 {
+	
 	int totalDataIndex = 0;
 	hexDataFile = open_file ("hexFile.hex", "w" );
 	if (hexDataFile == NULL) {
@@ -634,14 +633,14 @@ void writeHexDataTofile(uint8_t * fileData_Hex_String, int hexDataCharCount)
 		exit(0);
 	}
 	else{
-		for (int char_count_index = 0; totalDataIndex < hexDataCharCount; char_count_index)
+		for (int char_count_index = 0; totalDataIndex < data_local.HEX_array_size; char_count_index)
 		{
 			for (int line_index = 0; line_index < 16; ++line_index)
 			{
-				fprintf(hexDataFile, "%02X", fileData_Hex_String[totalDataIndex]);
+				fprintf(hexDataFile, "%02X", data_local.HEX_array[totalDataIndex]);
 				totalDataIndex++;
 				// If we reach the end-of-data, exit loops.
-				if (totalDataIndex == hexDataCharCount){break;}
+				if (totalDataIndex == data_local.HEX_array_size){break;}
 			}
 			fprintf(hexDataFile, "\n");		
 		}
@@ -675,11 +674,6 @@ int fileSizer()
 }
 
 
-// LPC handling
-uint8_t set_ISP_mode(int print);
-uint8_t get_LPC_Info(bool print);
-void command_response();
-void OK();
 ///////////// LPC Handling ///////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -989,13 +983,10 @@ void check_HM_10()
 
 
 // Data Handling
-int hex_file_to_array(uint8_t * hex_data_array, int file_size)
+struct Data hex_file_to_array(struct Data data_local, int file_size)
 {
-	//To hold file hex values.
-	//uint8_t hex_data_array[MAX_SIZE];
-	int hex_data_array_index = 0;
 	
-
+	//To hold file hex values.
 	uint8_t fhex_byte_count[MAX_SIZE_16];
 	uint8_t fhex_address1[MAX_SIZE_16];
 	uint8_t fhex_address2[MAX_SIZE_16];
@@ -1044,10 +1035,10 @@ int hex_file_to_array(uint8_t * hex_data_array, int file_size)
 			while (hex_data_index < chars_this_line && totalCharsRead < file_size && chars_this_line != 0x00)
 			{
 				//Store the completed hex value in the char array.
-				hex_data_array[hex_data_array_index] = readByte();
+				data_local.HEX_array[data_local.HEX_array_size] = readByte();
 				
 				//Index for data.
-				hex_data_array_index++;	
+				data_local.HEX_array_size++;	
 				hex_data_index++;			
 			}
 
@@ -1065,12 +1056,13 @@ int hex_file_to_array(uint8_t * hex_data_array, int file_size)
 	}
 
 	// Assure # of bytes are divisble by 4.
-	while(!(hex_data_array_index % 4 == 0))
+	while(!(data_local.HEX_array_size % 4 == 0))
 	{
-		hex_data_array[hex_data_array_index] = ' ';
-		hex_data_array_index++;
+		data_local.HEX_array[data_local.HEX_array_size] = ' ';
+		data_local.HEX_array_size++;
 	}
-	return hex_data_array_index;
+	printf("CHECK THIS NUMBER %i\n", data_local.HEX_array_size);
+	return data_local;
 }
 
 int check_sum(uint8_t * hex_data_array, int hex_data_array_size)

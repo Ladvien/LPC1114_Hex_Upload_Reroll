@@ -210,8 +210,8 @@ void clearConsole();
 void startScreen();
 
 // Write to RAM.
-int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint32_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written);
-int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_data_array, int hex_data_array_size, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written);
+struct Write_to_RAM write_two_pages_to_ram(struct Write_to_RAM write_to_RAM_local, struct Data data_local, uint8_t * uue_pages_or_scrap_array, uint32_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written);
+struct Write_to_RAM uue_create_pages_or_scrap(struct Write_to_RAM write_to_RAM_local, struct Data data_local, uint8_t * uue_pages_or_scrap_array, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written);
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
 
 // Timers
@@ -321,8 +321,12 @@ int main(int argc, uint8_t *argv[])
 	while(bytes_written < data.HEX_array_size)
 	{
 		// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
-		uue_pages_or_scrap_char_count = uue_create_pages_or_scrap(uue_pages_or_scrap_array, data.HEX_array, data.HEX_array_size, &pages_or_scrap_check_sum, &number_of_bytes_to_write, &bytes_written);
-		write_two_pages_to_ram(uue_pages_or_scrap_array, &ram_address, uue_pages_or_scrap_char_count, pages_or_scrap_check_sum, number_of_bytes_to_write, hex_data_array_size, &bytes_written);
+		write_to_RAM = uue_create_pages_or_scrap(write_to_RAM, data, uue_pages_or_scrap_array, &pages_or_scrap_check_sum, &number_of_bytes_to_write, &bytes_written);
+		for (int i = 0; i < uue_pages_or_scrap_char_count; ++i)
+		{
+			printf("%C ", uue_pages_or_scrap_array[i]);
+		}
+		write_two_pages_to_ram(write_to_RAM, data, uue_pages_or_scrap_array, &ram_address, uue_pages_or_scrap_char_count, pages_or_scrap_check_sum, number_of_bytes_to_write, hex_data_array_size, &bytes_written);
 	}
 
 	printf("Upload time in seconds: %.3f\n", timer());
@@ -1093,6 +1097,11 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 	int uue_length_char_index = 45;
 	int padded_index = 0;
 	int bytes_left = 0;
+
+	for (int i = 0; i < hex_data_array_size; ++i)
+	{
+		//printf("%02X ", hex_data_array[i]);
+	}
 	
 
 	// 1. Add char for characters per line.
@@ -1311,7 +1320,7 @@ void startScreen()
 }
 
 // Write to RAM.
-int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint32_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written)
+struct Write_to_RAM write_two_pages_to_ram(struct Write_to_RAM write_to_RAM_local, struct Data data_local, uint8_t * uue_pages_or_scrap_array, uint32_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written)
 {
 	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
@@ -1353,27 +1362,27 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint32_t * ram_ad
 	while(successful < 3){
 		// 3. Send intent-to-write string.
 		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), NO_PRINT, 0);
-		txString("\n", sizeof("\n"), NO_PRINT, 0);
+		txString("\n", sizeof("\n"), PRINT, 0);
 		Sleep(100);
-		rx(PARSE, NO_PRINT);
+		rx(PARSE, PRINT);
 
 		// 4. Send two pages of data: "DATA\n"
-		utxString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, NO_PRINT, slow_down);
+		utxString(uue_pages_or_scrap_array, uue_pages_or_scrap_char_count+2, PRINT, slow_down);
 		//Sleep(200);
 		
-		txString("\n", sizeof("\n"), NO_PRINT, 0);
+		txString("\n", sizeof("\n"), PRINT, 0);
 		Sleep(120);
-		rx(NO_PARSE, NO_PRINT);
+		rx(NO_PARSE, PRINT);
 
 		// 5. Send checksum: "Chk_sum\n"
 		snprintf(checksum_as_string, 10, "%i\n", pages_or_scrap_check_sum);
-		txString(checksum_as_string, tx_size(checksum_as_string), NO_PRINT, 0);
-		txString("\n", sizeof("\n"), NO_PRINT, 0);
+		txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
+		txString("\n", sizeof("\n"), PRINT, 0);
 		Sleep(110);
 		printf("\n");
 
 		successful = rx(PARSE, PRINT);
-		
+
 		write_attempt++;
 
 		// Slow things down, in case the write doesn't work and we go again.
@@ -1399,7 +1408,7 @@ int write_two_pages_to_ram(uint8_t * uue_pages_or_scrap_array, uint32_t * ram_ad
 
 }
 
-int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_data_array, int hex_data_array_size, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written)
+struct Write_to_RAM uue_create_pages_or_scrap(struct Write_to_RAM write_to_RAM_local, struct Data data_local, uint8_t * uue_pages_or_scrap_array, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written)
 {
 	// 0. Add a check to see if data is insufficient for two pages,
 	// if so, divert to get_scrap_paper().
@@ -1415,7 +1424,7 @@ int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_
 	int buffer_index = 0;
 
 	// Bytes note yet written to RAM.
-	int bytes_left_to_write = (hex_data_array_size - *bytes_written);
+	int bytes_left_to_write = (data_local.HEX_array_size - *bytes_written);
 
 	
 	if (bytes_left_to_write < 128)
@@ -1424,7 +1433,8 @@ int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_
 
 		while(buffer_index != bytes_left_to_write)
 		{
-			hex_two_page_array[buffer_index] = hex_data_array[load_data_index];
+			hex_two_page_array[buffer_index] = data_local.HEX_array[load_data_index];
+			printf("%02X ", hex_two_page_array[buffer_index]);			
 			load_data_index++;
 			buffer_index++;
 		}
@@ -1445,7 +1455,8 @@ int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_
 		// 1. Get 512 bytes of hex data (two pages).
 		while(buffer_index != 128)
 		{
-			hex_two_page_array[buffer_index] = hex_data_array[load_data_index];
+			hex_two_page_array[buffer_index] = data_local.HEX_array[load_data_index];
+			printf("%02X ", hex_two_page_array[buffer_index]);			
 			load_data_index++;
 			buffer_index++;
 		}
@@ -1460,7 +1471,8 @@ int uue_create_pages_or_scrap(uint8_t * uue_pages_or_scrap_array, uint8_t * hex_
 		// 4. Return checksum and UUEncoded array.
 	}
 	
-	return uue_pages_or_scrap_char_count;
+
+	return write_to_RAM_local;
 }
 
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string)

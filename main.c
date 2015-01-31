@@ -99,10 +99,10 @@ int command_response_code = 0;
 struct Write_to_RAM
 {
 	// Holds the raw hex data, straight from the file.
-	uint8_t data_to_write[7][1024];	
-	int data_to_write_check_sum[7];
+	uint8_t data_to_write[32][128];	
+	int data_to_write_check_sum[32];
 	int bytes_written;
-	int number_of_bytes_to_write[7];
+	int number_of_bytes_to_write[32];
 	int UUE_char_count;
 };
 //uue_pages_or_scrap_array, 
@@ -211,7 +211,8 @@ void startScreen();
 
 // Write to RAM.
 struct Write_to_RAM write_two_pages_to_ram(struct Write_to_RAM write_to_RAM_local, struct Data data_local, uint8_t * uue_pages_or_scrap_array, uint32_t * ram_address, int uue_pages_or_scrap_char_count, int pages_or_scrap_check_sum, int number_of_bytes_to_write, int hex_data_array_size, int * bytes_written);
-struct Write_to_RAM uue_create_pages_or_scrap(struct Write_to_RAM write_to_RAM_local, struct Data data_local, uint8_t * uue_pages_or_scrap_array, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written);
+//struct Write_to_RAM uue_create_pages_or_scrap(struct Write_to_RAM write_to_RAM_local, struct Data data_local, uint8_t * uue_pages_or_scrap_array, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written);
+struct Write_to_RAM prepare_to_write_sector(struct Write_to_RAM write_to_RAM_local, struct Data data_local);
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
 
 // Timers
@@ -321,7 +322,7 @@ int main(int argc, uint8_t *argv[])
 	while(bytes_written < data.HEX_array_size)
 	{
 		// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
-		write_to_RAM = uue_create_pages_or_scrap(write_to_RAM, data, uue_pages_or_scrap_array, &pages_or_scrap_check_sum, &number_of_bytes_to_write, &bytes_written);
+		write_to_RAM = prepare_to_write_sector(write_to_RAM, data);
 		for (int i = 0; i < uue_pages_or_scrap_char_count; ++i)
 		{
 			printf("%C ", uue_pages_or_scrap_array[i]);
@@ -1408,7 +1409,77 @@ struct Write_to_RAM write_two_pages_to_ram(struct Write_to_RAM write_to_RAM_loca
 
 }
 
-struct Write_to_RAM uue_create_pages_or_scrap(struct Write_to_RAM write_to_RAM_local, struct Data data_local, uint8_t * uue_pages_or_scrap_array, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written)
+
+
+
+struct Write_to_RAM prepare_to_write_sector(struct Write_to_RAM write_to_RAM_local, struct Data data_local)
+{
+	// 1. Load hex data into array.
+	// 2. UUEencode the chunk & get UUE char count.
+	// 3. Calculate chunk checksum.
+	// 4. Copy encoded data into sector array.
+	// 5. If bytes_written = bytes_to_write; then fill the rest of
+	// the sector with FF.
+
+	static int load_data_index;
+	int uue_pages_or_scrap_char_count = 0;
+	uint8_t data_array_buffer[128];
+	uint8_t UUE_char_array_buffer[172];
+	int count = 0;
+	int buffer_index = 0;
+	int half_page_index = 0;
+	/*
+	struct Write_to_RAM
+	{
+		// Holds the raw hex data, straight from the file.
+		uint8_t data_to_write[32][128];	
+		int data_to_write_check_sum[32];
+		int bytes_written;
+		int number_of_bytes_to_write[32];
+		int UUE_char_count;
+	};
+	*/
+	//data_local.HEX_array
+	//data_local.HEX_array_size
+
+	// Load 4096 bytes.
+	while(half_page_index < 32){
+		
+		while(buffer_index != write_to_RAM_local.bytes_written)
+		{
+			data_array_buffer[buffer_index] = data_local.HEX_array[load_data_index];
+			printf("%02X ", data_array_buffer[buffer_index]);			
+			load_data_index++;
+			buffer_index++;
+		}
+
+		write_to_RAM_local.number_of_bytes_to_write[half_page_index] = buffer_index;
+		
+		// 2. UUEencode the chunk & get UUE char count.
+		write_to_RAM_local.UUE_char_count = UUEncode(UUE_char_array_buffer, data_array_buffer, buffer_index);
+
+		// 3. Create checksum for encoded pages.
+		write_to_RAM_local.data_to_write_check_sum[half_page_index] = check_sum(data_array_buffer, buffer_index);
+
+		// 1. Load chunk into array.
+		for (int i = 0; i < 128; ++i)
+		{
+			//data_array_buffer[i] =  ;
+			//write_to_RAM_local.data_to_write[half_page_index][i] = ;
+			load_data_index++;
+		}
+		half_page_index++;
+	}
+
+	
+
+	// 4. If bytes_written = bytes_to_write; then fill the rest of
+	// the sector with FF.
+
+
+}
+
+struct Write_to_RAM uue_create_pages_or_scrap2(struct Write_to_RAM write_to_RAM_local, struct Data data_local, uint8_t * uue_pages_or_scrap_array, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written)
 {
 	// 0. Add a check to see if data is insufficient for two pages,
 	// if so, divert to get_scrap_paper().
@@ -1416,11 +1487,11 @@ struct Write_to_RAM uue_create_pages_or_scrap(struct Write_to_RAM write_to_RAM_l
 	// 2. Create UUEncode array from hex pages.
 	// 3. Create checksum for encoded pages.
 	// 4. Return checksum and UUEncoded array.
-
+	
+	static int load_data_index;
 	int uue_pages_or_scrap_char_count = 0;
 	uint8_t hex_two_page_array[2048];
 	int count = 0;
-	static int load_data_index;
 	int buffer_index = 0;
 
 	// Bytes note yet written to RAM.

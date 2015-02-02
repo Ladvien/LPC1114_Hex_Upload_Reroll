@@ -112,8 +112,13 @@ struct write
 	int UUE_chunk_B_UUE_char_count;
 
 	int chunk_index;
-	int bytes_loaded;
+	int bytes_loaded_A;
+	int bytes_loaded_B;
 	int bytes_written;
+
+	// ISP uses RAM from 0x1000 017C to 0x1000 17F
+	uint32_t ram_address;
+
 };
 
 struct Data
@@ -255,6 +260,10 @@ int main(int argc, uint8_t *argv[])
 	struct Data data;
 	struct write write;
 
+	// ISP uses RAM from 0x1000 017C to 0x1000 17F
+	write.ram_address = 0x1000017C;
+
+
 	// Local for FTDI State Machine.
 	//FTDI_state FTDI_Operation = RX_CLOSE;
 
@@ -317,18 +326,16 @@ int main(int argc, uint8_t *argv[])
 	Sleep(120);
 	rx(PARSE, PRINT);
 	
-	// ISP uses RAM from 0x1000 017C to 0x1000 17F
-	uint32_t ram_address = 0x1000017C;
-
 	//while(bytes_written < data.HEX_array_size)
 	//{
 		// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
 		write = prepare_page_to_write(write, data);
 		write_page_to_ram(write, data);
 
+
 	//}
 
-	printf("Upload time in seconds: %.3f\n", timer());
+	printf("\n\nUpload time in seconds: %.3f\n", timer());
 
 	/*
 	// Read memory
@@ -1321,33 +1328,73 @@ void startScreen()
 // Write to RAM.
 struct write write_page_to_ram(struct write write_local, struct Data data_local)
 {
-	// 1. Convert RAM address from hex to decimal, then, from decimal to ASCII.
+	// 1. Convert RAM address_A from hex to decimal, then from decimal to ASCII.
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
 	// 3. Send intent-to-write string.
-	// 4. Send two pages of data: "DATA\n"
+	// 4. Send chunk_A of data: "DATA\n"
 	// 5. Send checksum: "Chk_sum\n"
 	// 6. Read response from LPC.
-	// 7. Determine if write was a success.
 	// 8. Repeat write if necessary.
 	// 9. Return true if successful (combine step 9?)
-
+	
+	// Locals for creating intent_to_write string.
 	uint8_t address_as_string[9];
-	uint32_t hex_ram_address = 0;
 	long int dec_ram_address = 0;
 	uint8_t dec_address_as_string[32];
 	uint8_t intent_to_write_string[512];
+	uint8_t intent_to_write_to_ram_string[512];
 	uint8_t checksum_as_string[64];
+	
+	// Used to determine if write operation succeeded.
 	int successful = 0;
 
+	// Used to slow txString if write failed.
 	int slow_down = 0;
-	//int bytes_left_to_write = 0;(hex_data_array_size - *bytes_written);
+
+	int bytes_left_to_write = (data_local.HEX_array_size - write_local.bytes_written);
+	printf("bytes_left_to_write %i\n", bytes_left_to_write);
 
 	static int write_success = 0, write_attempt = 0;
 	float success_ratio = 0;
 
+	// ISP uses RAM from 0x1000 017C to 0x1000 17F
+	write_local.ram_address = 0x1000017C;
 
+	/////// CHUNK A ////////
 
+	// 1. Convert RAM address_A from hex to decimal, then from decimal to ASCII.
+	convert_32_hex_address_to_string(write_local.ram_address, address_as_string);
+	dec_ram_address = strtol(address_as_string, NULL, 16);
+	snprintf(dec_address_as_string, sizeof(dec_address_as_string), "%d", dec_ram_address);
 
+	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, write_local.bytes_loaded_A);
+
+	// Loops until succeeded.
+	while(successful < 3){
+		// 3. Send intent-to-write string.
+		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), PRINT, 0);
+		txString("\n", sizeof("\n"), PRINT, 0);
+		Sleep(100);
+		rx(PARSE, PRINT);
+
+		// 4. Send chunk_A of data: "DATA\n"
+		utxString(write_local.UUE_chunk_A, write_local.UUE_chunk_A_UUE_char_count, PRINT, slow_down);
+		Sleep(300);	
+		txString("\n", sizeof("\n"), PRINT, 0);
+
+		// 5. Send checksum: "Chk_sum\n"
+		snprintf(checksum_as_string, 10, "%i\n", write_local.UUE_chunk_A_check_sum);
+		txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
+		txString("\n", sizeof("\n"), PRINT, 0);
+		Sleep(110);
+	
+		// 6. Read response from LPC.
+		successful = rx(PARSE, PRINT);
+		write_attempt++;	
+
+		// 8. Repeat write if necessary.
+	} // Loop if fail.
 	if (successful == 3)
 	{
 		// No need to slow down.
@@ -1356,15 +1403,79 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 		//Success counter.
 		write_success++;
 
-		// All count data written on a successful write.
-		//*bytes_written += number_of_bytes_to_write;
+		// Reset success counter for B
+		successful = 0;
+		
+		
+		// We show chunk A has been written.
+		write_local.bytes_written += write_local.bytes_loaded_A;
 	}
 
-	//printf("Bytes written: %i\n", *bytes_written);
+	printf("Bytes written: %i\n", write_local.bytes_written);
 
+
+	// Increament RAM address by 128.
+	
+	write_local.ram_address += 128;
+
+
+	/////// CHUNK B ////////
+
+	// 1. Convert RAM address_A from hex to decimal, then from decimal to ASCII.
+	convert_32_hex_address_to_string(write_local.ram_address, address_as_string);
+	dec_ram_address = strtol(address_as_string, NULL, 16);
+	snprintf(dec_address_as_string, sizeof(dec_address_as_string), "%d", dec_ram_address);
+
+	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, write_local.bytes_loaded_B);
+
+	// Loops until succeeded.
+	while(successful < 3){
+		// 3. Send intent-to-write string.
+		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), PRINT, 0);
+		txString("\n", sizeof("\n"), PRINT, 0);
+		Sleep(100);
+		rx(PARSE, PRINT);
+
+		// 4. Send chunk_A of data: "DATA\n"
+		utxString(write_local.UUE_chunk_B, write_local.UUE_chunk_B_UUE_char_count, PRINT, slow_down);
+		Sleep(300);	
+		txString("\n", sizeof("\n"), PRINT, 0);
+
+		// 5. Send checksum: "Chk_sum\n"
+		snprintf(checksum_as_string, 10, "%i\n", write_local.UUE_chunk_B_check_sum);
+		txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
+		txString("\n", sizeof("\n"), PRINT, 0);
+		Sleep(110);
+	
+		// 6. Read response from LPC.
+		successful = rx(PARSE, PRINT);
+		write_attempt++;
+		// 8. Repeat write if necessary.
+	} // Loop if fail.
+	if (successful == 3)
+	{
+		// No need to slow down.
+		slow_down = 0;
+
+		//Success counter.
+		write_success++;
+
+		// Reset success counter for B
+		successful = 0;
+
+		// We show chunk A has been written.
+		write_local.bytes_written += write_local.bytes_loaded_B;
+	}
+
+	// Update how many bytes we have left.
+	bytes_left_to_write = (data_local.HEX_array_size - write_local.bytes_written);
+	printf("bytes_left_to_write %i\n", bytes_left_to_write);
+	
+	printf("Bytes written: %i\n", write_local.bytes_written);
 	// Calculates the success rate of write()
-	//success_ratio = ((float)write_success / write_attempt) * 100;
-	//printf("Write to RAM success: %%%.2f\n", success_ratio);
+	success_ratio = ((float)write_success / write_attempt) * 100;
+	printf("Write to RAM success: %%%.2f\n", success_ratio);
 
 }
 
@@ -1395,11 +1506,11 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	// CHUNK A
 	for (int i = 0; i < 128; ++i)
 	{
-		if (write_local.bytes_loaded < data_local.HEX_array_size)
+		if (write_local.bytes_loaded_A < data_local.HEX_array_size)
 		{
 			HEX_chunkA_array_buf[i] = data_local.HEX_array[(128*write_local.chunk_index)+i];	
 		}
-		write_local.bytes_loaded++;
+		write_local.bytes_loaded_A++;
 		//printf("%02X ", HEX_chunkA_array_buf[i]);
 	}
 	write_local.chunk_index++;
@@ -1408,11 +1519,11 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	// CHUNK B
 	for (int i = 0; i < 128; ++i)
 	{
-		if (write_local.bytes_loaded < data_local.HEX_array_size)
+		if (write_local.bytes_loaded_B < data_local.HEX_array_size)
 		{
 			HEX_chunkB_array_buf[i] = data_local.HEX_array[(128*write_local.chunk_index)+i];	
 		}
-		write_local.bytes_loaded++;
+		write_local.bytes_loaded_B++;
 		//printf("%02X ", HEX_chunkB_array_buf[i]);
 	}
 	write_local.chunk_index++;

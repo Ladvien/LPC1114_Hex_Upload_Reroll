@@ -119,6 +119,9 @@ struct write
 	// ISP uses RAM from 0x1000 017C to 0x1000 17F
 	uint32_t ram_address;
 
+	// Flash address.
+	uint32_t Flash_address;
+	int sectors_needed;
 };
 
 struct Data
@@ -197,7 +200,6 @@ void check_HM_10();
 
 
 // Data Handling
-
 struct Data hex_file_to_array(struct Data data_local, int file_size);
 int check_sum(uint8_t * hex_data_array, int file_size);
 int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_array_size);
@@ -216,9 +218,10 @@ void clearConsole();
 void startScreen();
 
 // Write to RAM.
+int sectors_needed(int hex_data_array_size);
 struct write write_page_to_ram(struct write write_local, struct Data data_local);
-//struct write uue_create_pages_or_scrap(struct write write_local, struct Data data_local, uint8_t * uue_pages_or_scrap_array, int * pages_or_scrap_check_sum, int * number_of_bytes_to_write, int * bytes_written);
 struct write prepare_page_to_write(struct write write_local, struct Data data_local);
+struct write ram_to_flash(struct write write_local, struct Data data_local);
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
 
 // Timers
@@ -293,6 +296,10 @@ int main(int argc, uint8_t *argv[])
 	// Load the data from file
 	data = hex_file_to_array(data, fileSize);
 	
+	write.sectors_needed = sectors_needed(data.HEX_array_size);
+
+	printf("Sectors needed %i\n", write.sectors_needed);
+
 	// Write hex string back to a file.  Used for debugging.
 	writeHexDataTofile(data);
 	
@@ -326,13 +333,14 @@ int main(int argc, uint8_t *argv[])
 	Sleep(120);
 	rx(PARSE, PRINT);
 	
-	//while(bytes_written < data.HEX_array_size)
+	// Sectors
+	// 16 pages (128) * # of sectors (4096)
+	//for (int i = 0; i < (16 * write.sectors_needed); ++i)
 	//{
 		// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
 		write = prepare_page_to_write(write, data);
-		write_page_to_ram(write, data);
-
-
+		write = write_page_to_ram(write, data);
+		write = ram_to_flash(write, data);
 	//}
 
 	printf("\n\nUpload time in seconds: %.3f\n", timer());
@@ -1325,6 +1333,16 @@ void startScreen()
 	clearConsole();
 }
 
+int sectors_needed(int hex_data_array_size)
+{
+	int sectors_needed = 1;
+	while(sectors_needed * 4096 < hex_data_array_size)
+	{
+		sectors_needed++;
+	}
+	return sectors_needed;
+}
+
 // Write to RAM.
 struct write write_page_to_ram(struct write write_local, struct Data data_local)
 {
@@ -1368,7 +1386,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	snprintf(dec_address_as_string, sizeof(dec_address_as_string), "%d", dec_ram_address);
 
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
-	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, write_local.bytes_loaded_A);
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, 128);
 
 	// Loops until succeeded.
 	while(successful < 3){
@@ -1405,18 +1423,16 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 
 		// Reset success counter for B
 		successful = 0;
-		
-		
+				
 		// We show chunk A has been written.
 		write_local.bytes_written += write_local.bytes_loaded_A;
 	}
 
 	printf("Bytes written: %i\n", write_local.bytes_written);
 
-
-	// Increament RAM address by 128.
-	
+	// Increament RAM address by 128.	
 	write_local.ram_address += 128;
+
 
 
 	/////// CHUNK B ////////
@@ -1427,7 +1443,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	snprintf(dec_address_as_string, sizeof(dec_address_as_string), "%d", dec_ram_address);
 
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
-	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, write_local.bytes_loaded_B);
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, 128);
 
 	// Loops until succeeded.
 	while(successful < 3){
@@ -1477,6 +1493,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	success_ratio = ((float)write_success / write_attempt) * 100;
 	printf("Write to RAM success: %%%.2f\n", success_ratio);
 
+	return write_local;
 }
 
 
@@ -1557,6 +1574,15 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	//}
 	//printf("\nchar count B %i\n", write_local.UUE_chunk_B_UUE_char_count);
 	//printf("\ncheck sum B %i\n", write_local.UUE_chunk_B_check_sum);
+
+	return write_local;
+}
+
+struct write ram_to_flash(struct write write_local, struct Data data_local)
+{
+	printf("\n\n\n");
+	printf("write_local.Flash_address %02X\n", write_local.Flash_address);
+	write_local.Flash_address += 256;
 
 	return write_local;
 }

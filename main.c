@@ -122,6 +122,8 @@ struct write
 	// Flash address.
 	uint32_t Flash_address;
 	int sectors_needed;
+	int sector_to_write;
+	int sector_index;
 };
 
 struct Data
@@ -299,6 +301,11 @@ int main(int argc, uint8_t *argv[])
 	
 	write.sectors_needed = sectors_needed(data.HEX_array_size);
 
+	// Start with last sector needed.
+	write.sector_index = (write.sectors_needed - 1);
+	write.sector_to_write = ((write.sector_index) * 4096);
+	write.Flash_address = write.sector_to_write;
+
 	printf("Sectors needed %i\n", write.sectors_needed);
 
 	// Write hex string back to a file.  Used for debugging.
@@ -339,13 +346,13 @@ int main(int argc, uint8_t *argv[])
 
 	// Sectors
 	// 16 pages (128) * # of sectors (4096)
-	//for (int i = 0; i < (16 * write.sectors_needed); ++i)
-	//{
+	for (int i = 0; i < (16 * write.sectors_needed); ++i)
+	{
 		// UUEncode 2 pages (512 bytes).  Returns UUE character count (~1033)
 		write = prepare_page_to_write(write, data);
 		write = write_page_to_ram(write, data);
 		write = ram_to_flash(write, data);
-	//}
+	}
 
 	printf("\n\nUpload time in seconds: %.3f\n", timer());
 
@@ -1388,7 +1395,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	int slow_down = 0;
 
 	int bytes_left_to_write = (data_local.HEX_array_size - write_local.bytes_written);
-	printf("bytes_left_to_write %i\n", bytes_left_to_write);
+	//printf("bytes_left_to_write %i\n", bytes_left_to_write);
 
 	static int write_success = 0, write_attempt = 0;
 	float success_ratio = 0;
@@ -1446,7 +1453,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 		write_local.bytes_written += write_local.bytes_loaded_A;
 	}
 
-	printf("Bytes written: %i\n", write_local.bytes_written);
+	//printf("Bytes written: %i\n", write_local.bytes_written);
 
 	// Increament RAM address by 128.	
 	write_local.ram_address += 128;
@@ -1504,12 +1511,13 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 
 	// Update how many bytes we have left.
 	bytes_left_to_write = (data_local.HEX_array_size - write_local.bytes_written);
-	printf("bytes_left_to_write %i\n", bytes_left_to_write);
+	//printf("bytes_left_to_write %i\n", bytes_left_to_write);
 	
-	printf("Bytes written: %i\n", write_local.bytes_written);
+	//printf("Bytes written: %i\n", write_local.bytes_written);
+	
 	// Calculates the success rate of write()
 	success_ratio = ((float)write_success / write_attempt) * 100;
-	printf("Write to RAM success: %%%.2f\n", success_ratio);
+	//printf("Write to RAM success: %%%.2f\n", success_ratio);
 
 	return write_local;
 }
@@ -1605,6 +1613,27 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	uint8_t intent_to_write_string[512];
 	uint8_t intent_to_write_to_flash_string[512];
 
+	// Used to determine sector ( 32 * 128 = 4096)
+	static int page_index;
+	
+
+	// 0. Point to current sector.
+	if (page_index == 16)
+	{
+		write_local.sector_index--;
+		if (write_local.sector_index < 0)
+		{
+			write_local.sector_index = 0;
+		}
+		write_local.sector_to_write = ((write_local.sectors_needed - write_local.sector_index) * 4096);
+		
+		page_index = 0;
+	}
+
+	printf("chunk indxex %i\n", page_index);
+	printf("sector_to_write %i\n", write_local.sector_to_write);
+	
+
 	// 1. Convert RAM address_A from hex to decimal, then from decimal to ASCII.
 	convert_32_hex_address_to_string(write_local.Flash_address, address_as_string);
 	dec_flash_address = strtol(address_as_string, NULL, 16);
@@ -1613,7 +1642,8 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
 	snprintf(intent_to_write_to_flash_string, sizeof(intent_to_write_to_flash_string), "C %s 268435836 %i\n", flash_address_as_string, 256);
 
-	txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);
+	//txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);
+	
 	txString("\n", sizeof("\n"), PRINT, 0);
 	Sleep(300);
 	rx(NO_PARSE, PRINT);
@@ -1622,6 +1652,8 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	printf("\n\n\n");
 	printf("write_local.Flash_address %02X\n", write_local.Flash_address);
 	write_local.Flash_address += 256;
+
+	page_index++;
 
 	return write_local;
 }

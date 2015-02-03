@@ -129,7 +129,7 @@ struct write
 struct Data
 {
 	// Holds the raw hex data, straight from the file.
-	uint8_t HEX_array[32768];
+	uint8_t HEX_array[128000];
 	int HEX_array_size;
 };
 
@@ -1621,12 +1621,13 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	if (page_index == 16)
 	{
 		write_local.sector_index--;
-		if (write_local.sector_index < 0)
+
+		write_local.Flash_address = (write_local.sector_index * 4096);
+		printf("%02X\n", write_local.Flash_address);
+		if (write_local.Flash_address < 0)
 		{
-			write_local.sector_index = 0;
+			write_local.Flash_address = 0;
 		}
-		write_local.sector_to_write = ((write_local.sectors_needed - write_local.sector_index) * 4096);
-		
 		page_index = 0;
 	}
 

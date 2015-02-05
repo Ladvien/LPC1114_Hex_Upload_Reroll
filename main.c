@@ -1363,7 +1363,7 @@ int prepare_sectors(int sectors_needed)
 	txString("\n", sizeof("\n"), PRINT, 0);
 	rx(PARSE, PRINT);
 	Sleep(300);
-	printf("Secotors prepared: #");
+	printf("Sectors prepared: # ");
 	rx(PARSE, PRINT);
 
 }
@@ -1455,11 +1455,9 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 
 	//printf("Bytes written: %i\n", write_local.bytes_written);
 
+
 	// Increament RAM address by 128.	
 	write_local.ram_address += 128;
-
-
-
 	/////// CHUNK B ////////
 
 	// 1. Convert RAM address_A from hex to decimal, then from decimal to ASCII.
@@ -1480,7 +1478,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 
 		// 4. Send chunk_A of data: "DATA\n"
 		utxString(write_local.UUE_chunk_B, write_local.UUE_chunk_B_UUE_char_count, PRINT, slow_down);
-		Sleep(300);	
+		Sleep(150);	
 		txString("\n", sizeof("\n"), PRINT, 0);
 
 		// 5. Send checksum: "Chk_sum\n"
@@ -1517,13 +1515,10 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	
 	// Calculates the success rate of write()
 	success_ratio = ((float)write_success / write_attempt) * 100;
-	//printf("Write to RAM success: %%%.2f\n", success_ratio);
+	printf("Write to RAM success: %%%.2f\n", success_ratio);
 
 	return write_local;
 }
-
-
-
 
 struct write prepare_page_to_write(struct write write_local, struct Data data_local)
 {
@@ -1551,8 +1546,10 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	{
 		if (write_local.bytes_loaded_A < data_local.HEX_array_size)
 		{
-			HEX_chunkA_array_buf[i] = data_local.HEX_array[(128*write_local.chunk_index)+i];	
+			HEX_chunkA_array_buf[i] = data_local.HEX_array[(128*write_local.chunk_index)+(write_local.sector_index * 4096)+i];	
 		}
+		
+		printf("X:%i\n", (128*write_local.chunk_index)+(write_local.sector_index * 4096)+i);
 		write_local.bytes_loaded_A++;
 		//printf("%02X ", HEX_chunkA_array_buf[i]);
 	}
@@ -1564,9 +1561,10 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	{
 		if (write_local.bytes_loaded_B < data_local.HEX_array_size)
 		{
-			HEX_chunkB_array_buf[i] = data_local.HEX_array[(128*write_local.chunk_index)+i];	
+			HEX_chunkB_array_buf[i] = data_local.HEX_array[(128*write_local.chunk_index)+(write_local.sector_index * 4096)+i];	
 		}
 		write_local.bytes_loaded_B++;
+		//printf("%i\n", ((128*write_local.chunk_index)+(write_local.sector_index * 4096)+i));
 		//printf("%02X ", HEX_chunkB_array_buf[i]);
 	}
 	write_local.chunk_index++;
@@ -1621,7 +1619,7 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	if (page_index == 16)
 	{
 		write_local.sector_index--;
-
+		write_local.chunk_index = 0;
 		write_local.Flash_address = (write_local.sector_index * 4096);
 		printf("%02X\n", write_local.Flash_address);
 		if (write_local.Flash_address < 0)
@@ -1631,8 +1629,8 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 		page_index = 0;
 	}
 
-	printf("chunk indxex %i\n", page_index);
-	printf("sector_to_write %i\n", write_local.sector_to_write);
+	//printf("chunk indxex %i\n", page_index);
+	//printf("sector_to_write %i\n", write_local.sector_to_write);
 	
 
 	// 1. Convert RAM address_A from hex to decimal, then from decimal to ASCII.
@@ -1650,8 +1648,8 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	rx(NO_PARSE, PRINT);
 
 	printf("%s\n", intent_to_write_to_flash_string);
-	printf("\n\n\n");
-	printf("write_local.Flash_address %02X\n", write_local.Flash_address);
+	//printf("\n\n\n");
+	//printf("write_local.Flash_address %02X\n", write_local.Flash_address);
 	write_local.Flash_address += 256;
 
 	page_index++;

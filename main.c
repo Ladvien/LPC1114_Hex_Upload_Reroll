@@ -196,6 +196,7 @@ void command_response();
 void OK();
 void Failed();
 
+
 // HM-11 commands
 void wake_devices();
 void check_HM_10();
@@ -226,6 +227,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 struct write prepare_page_to_write(struct write write_local, struct Data data_local);
 struct write ram_to_flash(struct write write_local, struct Data data_local);
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
+struct write erase_chip(struct write write_local);
 
 // Timers
 float timer();
@@ -343,6 +345,9 @@ int main(int argc, uint8_t *argv[])
 	
 	// Preare those sectors.
 	prepare_sectors(write.sectors_needed);
+
+	// Clear the entire chip.
+	erase_chip(write);
 
 	// Sectors
 	// 16 pages (128) * # of sectors (4096)
@@ -1549,7 +1554,7 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 			HEX_chunkA_array_buf[i] = data_local.HEX_array[(128*write_local.chunk_index)+(write_local.sector_index * 4096)+i];	
 		}
 		
-		printf("X:%i\n", (128*write_local.chunk_index)+(write_local.sector_index * 4096)+i);
+	//	printf("X:%i\n", (128*write_local.chunk_index)+(write_local.sector_index * 4096)+i);
 		write_local.bytes_loaded_A++;
 		//printf("%02X ", HEX_chunkA_array_buf[i]);
 	}
@@ -1602,6 +1607,15 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	return write_local;
 }
 
+struct write erase_chip(struct write write_local)
+{
+		txString("E 0 1 2 3 4 5 6 7", sizeof("E 0 1 2 3 4 5 6 7"), PRINT, 0);
+		txString("\n", sizeof("\n"), PRINT, 0);
+		Sleep(200);
+		rx(PARSE, PRINT);
+
+}
+
 struct write ram_to_flash(struct write write_local, struct Data data_local)
 {
 	// Locals for creating intent_to_write string.
@@ -1641,13 +1655,13 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
 	snprintf(intent_to_write_to_flash_string, sizeof(intent_to_write_to_flash_string), "C %s 268435836 %i\n", flash_address_as_string, 256);
 
-	//txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);
+	txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);
 	
 	txString("\n", sizeof("\n"), PRINT, 0);
 	Sleep(300);
 	rx(NO_PARSE, PRINT);
 
-	printf("%s\n", intent_to_write_to_flash_string);
+	//printf("%s\n", intent_to_write_to_flash_string);
 	//printf("\n\n\n");
 	//printf("write_local.Flash_address %02X\n", write_local.Flash_address);
 	write_local.Flash_address += 256;

@@ -112,15 +112,19 @@ struct write
 	int UUE_chunk_B_UUE_char_count;
 
 	int chunk_index;
+	
 	int bytes_loaded_A;
 	int bytes_loaded_B;
-	int bytes_written;
+	
+	int bytes_loaded_index;
 
+	int bytes_written;
 	// ISP uses RAM from 0x1000 017C to 0x1000 17F
 	uint32_t ram_address;
 
 	// Flash address.
 	uint32_t Flash_address;
+
 	int sectors_needed;
 	int sector_to_prepare;
 	int sector_to_write;
@@ -229,6 +233,7 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 struct write ram_to_flash(struct write write_local, struct Data data_local);
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
 struct write erase_chip(struct write write_local);
+struct write pad_data_array(struct write write_local, struct Data data_local);
 
 // Timers
 float timer();
@@ -347,6 +352,8 @@ int main(int argc, uint8_t *argv[])
 	// Clear the entire chip.
 	erase_chip(write);
 
+	pad_data_array(write, data);
+	
 	// Sectors
 	// 16 pages (128) * # of sectors (4096)
 	for (int i = 0; i < (16 * write.sectors_needed); ++i)
@@ -1093,7 +1100,7 @@ struct Data hex_file_to_array(struct Data data_local, int file_size)
 		data_local.HEX_array[data_local.HEX_array_size] = ' ';
 		data_local.HEX_array_size++;
 	}
-	printf("CHECK THIS NUMBER %i\n", data_local.HEX_array_size);
+	
 	return data_local;
 }
 
@@ -1360,7 +1367,6 @@ int sectors_needed(int hex_data_array_size)
 int prepare_sectors(int sectors)
 {
 	uint8_t sectors_needed_string[128];
-
 	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P %i %i\n", sectors-2, sectors-1);
 	txString(sectors_needed_string, tx_size(sectors_needed_string), PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
@@ -1679,6 +1685,26 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	page_index++;
 
 	return write_local;
+}
+
+struct write pad_data_array(struct write write_local, struct Data data_local)
+{
+	// 1. Find start byte; take the index of data + 1.
+	// 2. Find the how many sectors will be needed in bytes.
+	// 3. Fill from start_byte to end_byte with FF.
+
+	int start_byte = 0;
+	int end_byte = 0;
+	
+	start_byte = data_local.HEX_array_size+1;
+	end_byte = (write_local.sectors_needed * 4096);
+	printf("%i %i\n", start_byte, end_byte);
+	for (int i = start_byte; i < end_byte; ++i)
+	{
+		data_local.HEX_array[i] = 0xFF;
+	}
+
+
 }
 
 

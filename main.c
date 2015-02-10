@@ -122,6 +122,7 @@ struct write
 	// Flash address.
 	uint32_t Flash_address;
 	int sectors_needed;
+	int sector_to_prepare;
 	int sector_to_write;
 	int sector_index;
 };
@@ -221,7 +222,7 @@ void clearConsole();
 void startScreen();
 
 // Write to RAM.
-int prepare_sectors(int sectors_needed);
+int prepare_sectors(int sectors);
 int sectors_needed(int hex_data_array_size);
 struct write write_page_to_ram(struct write write_local, struct Data data_local);
 struct write prepare_page_to_write(struct write write_local, struct Data data_local);
@@ -343,9 +344,6 @@ int main(int argc, uint8_t *argv[])
 	Sleep(120);
 	rx(PARSE, PRINT);
 	
-	// Preare those sectors.
-	prepare_sectors(write.sectors_needed);
-
 	// Clear the entire chip.
 	erase_chip(write);
 
@@ -851,79 +849,79 @@ void command_response()
 	// set in parseRx().
 	switch(command_response_code)
 	{
-		// 1
+		// 0
 		case RESP_CMD_SUCCESS:
 			printf("Command Success");
 			break;
-		// 2
+		// 1
 		case RESP_INVALID_COMMAND:
 			printf("Invalid Command");
 			break;
-		// 3
+		// 2
 		case RESP_SRC_ADDR_ERROR:
 			printf("Source Address Error");
 			break;
-		// 4
+		// 3
 		case RESP_SRC_ADDR_NOT_MAPPED:
 			printf("Source Address Not Mapped");
 			break;
-		// 5
+		// 4
 		case RESP_DST_ADDR_NOT_MAPPED:
 			printf("Destination Address Not Mapped");
 			break;
-		// 6
+		// 5
 		case RESP_COUNT_ERROR:
 			printf("Count Error");
 			break;
-		// 7
+		// 6
 		case RESP_INVALID_SECTOR:
 			printf("Invalid Sector");
 			break;
-		// 8
+		// 7
 		case RESP_SECTOR_NOT_BLANK:
 			printf("Sector Not Blank");
 			break;
-		// 9
+		// 8
 		case RESP_SECTOR_NOT_PREPARED_FOR_WRITE_OPERATION:
 			printf("Sector Not Prepared for Write Operation");
 			break;
-		// 10
+		// 9
 		case RESP_COMPARE_ERROR:
 			printf("Compare Error");
 			break;
-		// 11
+		// 10
 		case RESP_BUSY:
 			printf("Busy");
 			break;
-		// 12
+		// 11
 		case RESP_PARAM_ERROR:
 			printf("Parameter Error");
 			break;
-		// 13
+		// 12
 		case RESP_ADDR_ERROR:
 			printf("Address Error");
 			break;
-		// 14
+		// 13
 		case RESP_ADDR_NOT_MAPPED:
 			printf("Address Not Mapped");
 			break;
-		// 15
+		// 14
 		case RESP_CMD_LOCKED:
 			printf("Command Locked");
 			break;
-		// 16
+		// 15
 		case RESP_INVALID_CODE:
 			printf("Invalid Code");
 			break;
-		// 17
+		// 16
 		case RESP_INVALID_BAUD_RATE:
 			printf("Invalid Baud Rate");
 			break;
-		// 18
+		// 17
 		case RESP_INVALID_STOP_BIT:
 			printf("Invalid Stop Bit");
 			break;
-		// 19
+		// 18
 		case RESP_CODE_READ_PROTECTION_ENABLED:
 			printf("Code Read Protection Enabled");
 			break;			
@@ -1359,11 +1357,11 @@ int sectors_needed(int hex_data_array_size)
 	return sectors_needed;
 }
 
-int prepare_sectors(int sectors_needed)
+int prepare_sectors(int sectors)
 {
 	uint8_t sectors_needed_string[128];
 
-	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P 0 %i\n", sectors_needed-1);
+	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P %i %i\n", sectors-2, sectors-1);
 	txString(sectors_needed_string, tx_size(sectors_needed_string), PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
 	rx(PARSE, PRINT);
@@ -1609,10 +1607,21 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 
 struct write erase_chip(struct write write_local)
 {
-		txString("E 0 1 2 3 4 5 6 7", sizeof("E 0 1 2 3 4 5 6 7"), PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
-		Sleep(200);
-		rx(PARSE, PRINT);
+	uint8_t sectors_needed_string[128];
+
+	// THIS WILL NEED TO BE MODIFIED FOR OTHER CHIPS.
+	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P 0 7\n");
+	txString(sectors_needed_string, tx_size(sectors_needed_string), PRINT, 0);
+	txString("\n", sizeof("\n"), PRINT, 0);
+	rx(PARSE, PRINT);
+	Sleep(300);
+	printf("Sectors prepared: # ");
+	rx(PARSE, PRINT);		
+
+	txString("E 0 1 2 3 4 5 6 7", sizeof("E 0 1 2 3 4 5 6 7"), PRINT, 0);
+	txString("\n", sizeof("\n"), PRINT, 0);
+	Sleep(300);
+	rx(PARSE, PRINT);
 
 }
 
@@ -1646,6 +1655,8 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	//printf("chunk indxex %i\n", page_index);
 	//printf("sector_to_write %i\n", write_local.sector_to_write);
 	
+	// 0.5 Preare those sectors.
+	prepare_sectors(write_local.sector_index+1);
 
 	// 1. Convert RAM address_A from hex to decimal, then from decimal to ASCII.
 	convert_32_hex_address_to_string(write_local.Flash_address, address_as_string);
@@ -1655,8 +1666,7 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
 	snprintf(intent_to_write_to_flash_string, sizeof(intent_to_write_to_flash_string), "C %s 268435836 %i\n", flash_address_as_string, 256);
 
-	txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);
-	
+	txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);	
 	txString("\n", sizeof("\n"), PRINT, 0);
 	Sleep(300);
 	rx(NO_PARSE, PRINT);

@@ -112,16 +112,21 @@ struct write
 	int UUE_chunk_B_UUE_char_count;
 
 	int chunk_index;
+	
 	int bytes_loaded_A;
 	int bytes_loaded_B;
-	int bytes_written;
+	
+	int bytes_loaded_index;
 
+	int bytes_written;
 	// ISP uses RAM from 0x1000 017C to 0x1000 17F
 	uint32_t ram_address;
 
 	// Flash address.
 	uint32_t Flash_address;
+
 	int sectors_needed;
+	int sector_to_prepare;
 	int sector_to_write;
 	int sector_index;
 };
@@ -195,7 +200,7 @@ uint8_t get_LPC_Info(bool print);
 void command_response();
 void OK();
 void Failed();
-uint8_t set_RUN_mode(int print);
+
 
 // HM-11 commands
 void wake_devices();
@@ -221,14 +226,14 @@ void clearConsole();
 void startScreen();
 
 // Write to RAM.
-int prepare_sectors(int sectors_needed);
+int prepare_sectors(int sectors);
 int sectors_needed(int hex_data_array_size);
 struct write write_page_to_ram(struct write write_local, struct Data data_local);
 struct write prepare_page_to_write(struct write write_local, struct Data data_local);
 struct write ram_to_flash(struct write write_local, struct Data data_local);
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
 struct write erase_chip(struct write write_local);
-struct write validity_checksum(struct write write_local, struct Data data_local);
+struct Data pad_data_array(struct write write_local, struct Data data_local);
 
 // Timers
 float timer();
@@ -301,8 +306,10 @@ int main(int argc, uint8_t *argv[])
 
 	// Load the data from file
 	data = hex_file_to_array(data, fileSize);
-	
 	write.sectors_needed = sectors_needed(data.HEX_array_size);
+	
+	// Pad sector with FF's.
+	data = pad_data_array(write, data);
 
 	// Start with last sector needed.
 	write.sector_index = (write.sectors_needed - 1);
@@ -343,12 +350,12 @@ int main(int argc, uint8_t *argv[])
 	txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
 	Sleep(120);
 	rx(PARSE, PRINT);
-
+	
 	// Clear the entire chip.
 	erase_chip(write);
 
-	validity_checksum(write, data);
 
+	
 	// Sectors
 	// 16 pages (128) * # of sectors (4096)
 	for (int i = 0; i < (16 * write.sectors_needed); ++i)
@@ -361,7 +368,6 @@ int main(int argc, uint8_t *argv[])
 
 	printf("\n\nUpload time in seconds: %.3f\n", timer());
 
-	set_RUN_mode(NO_PRINT);
 	/*
 	// Read memory
 	txString("R 268436224 4\n", sizeof("R 268436224 4\n"), PRINT, 0);
@@ -371,6 +377,17 @@ int main(int argc, uint8_t *argv[])
 	Sleep(500);
 	rx(PARSE, PRINT);
 
+	// Read memory
+	txString("R 268436224 4\n", sizeof("R 268436224 4\n"), 0);
+	Sleep(500);
+	rx(NO000, rxString);
+	txString("OK\n", sizeof("OK\n"), 0);
+	Sleep(500);
+	rx(NO000, rxString);
+
+	//txString("#0V%T\n", sizeof("#0V%T\n"), 0);
+	//Sleep(500);
+	//rx(NO000, rxString);
 	*/
 
 	//Close files.
@@ -516,7 +533,7 @@ uint8_t utxString(uint8_t string[], int txString_size, bool printOrNot, int freq
 	for (int i = 0; i < (txString_size-1); i++){
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
 		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
-		Sleep(frequency_of_tx_char);
+		usleep(frequency_of_tx_char);
 
 		while((txString_size) < *ptr_bytes_written){Sleep(1000);}
 		 
@@ -713,20 +730,22 @@ uint8_t set_ISP_mode(int print)
 	// Let's attempt 3x to successfully set ISP mode
 	for (int i = 0; i < 5; ++i)
 	{	
-		// "AT+PIO30"
 		txString(HM_ISP_LOW, sizeof(HM_ISP_LOW), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
 
-		// "AT+PIO20"
 		txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
 		
-		// "AT+PIO21"
 		txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
+		Sleep(100);
+		successful += rx(PARSE, print);
+		printf(".");
+
+		txString(HM_ISP_HIGH, sizeof(HM_ISP_HIGH), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
@@ -765,57 +784,7 @@ uint8_t set_ISP_mode(int print)
 
 		// If all the HM-10 commands responded then
 		// the ISP mode should successfully be set.
-		if (successful > 5)
-		{
-			OK();
-			return 1;	
-		}
-		// Let's try 3x.
-		else
-		{
-			Failed();
-			successful = 0;
-			printf("Retrying.");
-			clearBuffers();
-			Sleep(500);
-		}
-	}
-	// RETURN NOTHING!
-	return 0;
-}
-
-uint8_t set_RUN_mode(int print)
-{
-	// Remotely set LPC into ISP mode.
-
-	// Test completeness of command.
-	int successful = 0;
-
-	printf("Setting RUN mode.");
-
-	// Let's attempt 3x to successfully set ISP mode
-	for (int i = 0; i < 5; ++i)
-	{	
-		// "AT+PIO31"
-		txString(HM_ISP_HIGH, sizeof(HM_ISP_HIGH), print, 0);
-		Sleep(100);
-		successful += rx(PARSE, print);
-		printf(".");
-
-		// "AT+PIO20"
-		txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
-		Sleep(100);
-		successful += rx(PARSE, print);
-		printf(".");
-		
-		// "AT+PIO21"
-		txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
-		Sleep(100);
-		successful += rx(PARSE, print);
-		printf(".");
-
-
-		if (successful > 3)
+		if (successful > 6)
 		{
 			OK();
 			return 1;	
@@ -889,79 +858,79 @@ void command_response()
 	// set in parseRx().
 	switch(command_response_code)
 	{
-		// 1
+		// 0
 		case RESP_CMD_SUCCESS:
 			printf("Command Success");
 			break;
-		// 2
+		// 1
 		case RESP_INVALID_COMMAND:
 			printf("Invalid Command");
 			break;
-		// 3
+		// 2
 		case RESP_SRC_ADDR_ERROR:
 			printf("Source Address Error");
 			break;
-		// 4
+		// 3
 		case RESP_SRC_ADDR_NOT_MAPPED:
 			printf("Source Address Not Mapped");
 			break;
-		// 5
+		// 4
 		case RESP_DST_ADDR_NOT_MAPPED:
 			printf("Destination Address Not Mapped");
 			break;
-		// 6
+		// 5
 		case RESP_COUNT_ERROR:
 			printf("Count Error");
 			break;
-		// 7
+		// 6
 		case RESP_INVALID_SECTOR:
 			printf("Invalid Sector");
 			break;
-		// 8
+		// 7
 		case RESP_SECTOR_NOT_BLANK:
 			printf("Sector Not Blank");
 			break;
-		// 9
+		// 8
 		case RESP_SECTOR_NOT_PREPARED_FOR_WRITE_OPERATION:
 			printf("Sector Not Prepared for Write Operation");
 			break;
-		// 10
+		// 9
 		case RESP_COMPARE_ERROR:
 			printf("Compare Error");
 			break;
-		// 11
+		// 10
 		case RESP_BUSY:
 			printf("Busy");
 			break;
-		// 12
+		// 11
 		case RESP_PARAM_ERROR:
 			printf("Parameter Error");
 			break;
-		// 13
+		// 12
 		case RESP_ADDR_ERROR:
 			printf("Address Error");
 			break;
-		// 14
+		// 13
 		case RESP_ADDR_NOT_MAPPED:
 			printf("Address Not Mapped");
 			break;
-		// 15
+		// 14
 		case RESP_CMD_LOCKED:
 			printf("Command Locked");
 			break;
-		// 16
+		// 15
 		case RESP_INVALID_CODE:
 			printf("Invalid Code");
 			break;
-		// 17
+		// 16
 		case RESP_INVALID_BAUD_RATE:
 			printf("Invalid Baud Rate");
 			break;
-		// 18
+		// 17
 		case RESP_INVALID_STOP_BIT:
 			printf("Invalid Stop Bit");
 			break;
-		// 19
+		// 18
 		case RESP_CODE_READ_PROTECTION_ENABLED:
 			printf("Code Read Protection Enabled");
 			break;			
@@ -1133,7 +1102,7 @@ struct Data hex_file_to_array(struct Data data_local, int file_size)
 		data_local.HEX_array[data_local.HEX_array_size] = ' ';
 		data_local.HEX_array_size++;
 	}
-
+	
 	return data_local;
 }
 
@@ -1180,6 +1149,7 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 	else
 	{
 		UUE_data_array[UUE_encoded_string_index] = 'M';
+
 	}
 
 	UUE_encoded_string_index++;
@@ -1292,6 +1262,7 @@ void clearSpecChar()
 	}
 }
 
+
 //Copied in from lpc21isp.c
 static uint8_t Ascii2Hex(uint8_t c)
 {
@@ -1341,7 +1312,7 @@ void clearBuffers()
 		ParsedRxBuffer[i] = 0;
 	}
 
-	// Clear RawRxBuffer
+		// Clear RawRxBuffer
 	for (int i = 0; i != sizeof(RawRxBuffer); ++i)
 	{
 		RawRxBuffer[i] = 0;
@@ -1398,50 +1369,14 @@ int sectors_needed(int hex_data_array_size)
 int prepare_sectors(int sectors)
 {
 	uint8_t sectors_needed_string[128];
-	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P %i %i\n", sectors-1, sectors-1);
+	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P %i %i\n", sectors-2, sectors-1);
 	txString(sectors_needed_string, tx_size(sectors_needed_string), PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
+	rx(PARSE, PRINT);
 	Sleep(300);
-	rx(PARSE, PRINT);		
-}
+	printf("Sectors prepared: # ");
+	rx(PARSE, PRINT);
 
-struct write validity_checksum(struct write write_local, struct Data data_local)
-{
-	// 1. Read vector table (bytes) 0-6
-	// 2. Add the 32 bit words together.
-	// 3. Take the sum and create two's complement.
-	// 4. Insert this in the 8th word.
-
-	uint32_t chck_sum_array[8];
-	uint32_t check_sum = 0;
-	uint32_t word = 0;
-	uint32_t validity_sum = 0;
-
-	// Little Endian
-	for (int i = 0; i < 28; i+=4)
-	{
-		chck_sum_array[i/4] = data_local.HEX_array[i] + (data_local.HEX_array[i+1] << 8) + (data_local.HEX_array[i+2] << 16) + (data_local.HEX_array[i+3] << 24);
-	}
-
-	for (int i = 0; i < 7; ++i)
-	{
-		check_sum += chck_sum_array[i];
-	}
-
-	check_sum = (~check_sum) + 1;
-	data_local.HEX_array[28] = check_sum & 0xff;
-	data_local.HEX_array[29] = (check_sum >>8 ) & 0xff;
-	data_local.HEX_array[30] = (check_sum>>16) & 0xff;
-	data_local.HEX_array[31] = (check_sum>>24) & 0xff;
-
-	for (int i = 0; i < 31; i+=4)
-	{
-		word = data_local.HEX_array[i] + (data_local.HEX_array[i+1] << 8) + (data_local.HEX_array[i+2] << 16) + (data_local.HEX_array[i+3] << 24);
-		validity_sum += word;
-	}
-
-	printf("Validity sum: %lu\n", validity_sum);
-	
 }
 
 // Write to RAM.
@@ -1498,7 +1433,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 		rx(PARSE, PRINT);
 
 		// 4. Send chunk_A of data: "DATA\n"
-		utxString(write_local.UUE_chunk_A, write_local.UUE_chunk_A_UUE_char_count, PRINT, slow_down);
+		utxString(write_local.UUE_chunk_A, write_local.UUE_chunk_A_UUE_char_count, NO_PRINT, slow_down);
 		Sleep(300);	
 		txString("\n", sizeof("\n"), NO_PRINT, 0);
 
@@ -1506,13 +1441,12 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 		snprintf(checksum_as_string, 10, "%i\n", write_local.UUE_chunk_A_check_sum);
 		txString(checksum_as_string, tx_size(checksum_as_string), NO_PRINT, 0);
 		txString("\n", sizeof("\n"), NO_PRINT, 0);
-		Sleep(140);
+		Sleep(110);
 	
 		// 6. Read response from LPC.
 		successful = rx(PARSE, PRINT);
 		write_attempt++;	
 
-		slow_down += 1;
 		// 8. Repeat write if necessary.
 	} // Loop if fail.
 	if (successful == 3)
@@ -1554,8 +1488,8 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 		rx(PARSE, PRINT);
 
 		// 4. Send chunk_A of data: "DATA\n"
-		utxString(write_local.UUE_chunk_B, write_local.UUE_chunk_B_UUE_char_count, PRINT, slow_down);
-		Sleep(200);	
+		utxString(write_local.UUE_chunk_B, write_local.UUE_chunk_B_UUE_char_count, NO_PRINT, slow_down);
+		Sleep(150);	
 		txString("\n", sizeof("\n"), NO_PRINT, 0);
 
 		// 5. Send checksum: "Chk_sum\n"
@@ -1597,7 +1531,6 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	return write_local;
 }
 
-
 struct write prepare_page_to_write(struct write write_local, struct Data data_local)
 {
 	
@@ -1611,7 +1544,7 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	uint8_t HEX_chunkB_array_buf[128];
 
 	// 0. Load arrays with FF.
-	for (int i = 0; i < 128; ++i)
+	for (int i = 128; i > 0; --i)
 	{
 		HEX_chunkA_array_buf[i] = 0xFF;
 		HEX_chunkB_array_buf[i] = 0xFF;	
@@ -1620,7 +1553,7 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	// 1. Load hex data into array A & get #bytes.
 	
 	// CHUNK A
-	for (int i = 0; i < 128; ++i)
+	for (int i = 128; i > 0; --i)
 	{
 		if (write_local.bytes_loaded_A < data_local.HEX_array_size)
 		{
@@ -1682,18 +1615,21 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 
 struct write erase_chip(struct write write_local)
 {
-		uint8_t sectors_needed_string[128];
-		snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P 0 7\n");
-		txString(sectors_needed_string, tx_size(sectors_needed_string), PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
-		rx(PARSE, PRINT);
-		Sleep(300);
-		
-		rx(PARSE, PRINT);
-		txString("E 0 1 2 3 4 5 6 7", sizeof("E 0 1 2 3 4 5 6 7"), PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
-		Sleep(200);
-		rx(PARSE, PRINT);
+	uint8_t sectors_needed_string[128];
+
+	// THIS WILL NEED TO BE MODIFIED FOR OTHER CHIPS.
+	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P 0 7\n");
+	txString(sectors_needed_string, tx_size(sectors_needed_string), NO_PRINT, 0);
+	txString("\n", sizeof("\n"), NO_PRINT, 0);
+	rx(PARSE, PRINT);
+	Sleep(300);
+	printf("Sectors prepared: # ");
+	rx(PARSE, PRINT);		
+
+	txString("E 0 1 2 3 4 5 6 7", sizeof("E 0 1 2 3 4 5 6 7"), NO_PRINT, 0);
+	txString("\n", sizeof("\n"), NO_PRINT, 0);
+	Sleep(300);
+	rx(PARSE, PRINT);
 
 }
 
@@ -1709,16 +1645,12 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	// Used to determine sector ( 32 * 128 = 4096)
 	static int page_index;
 	
-	printf("write_local.Flash_address %02X\n", write_local.Flash_address);
+
+
 	// 0. Point to current sector.
 	if (page_index == 16)
 	{
-
 		write_local.sector_index--;
-		if(write_local.sector_index < 0)
-		{
-			write_local.sector_index = 0;
-		}
 		write_local.chunk_index = 0;
 		write_local.Flash_address = (write_local.sector_index * 4096);
 		printf("%02X\n", write_local.Flash_address);
@@ -1743,8 +1675,7 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
 	snprintf(intent_to_write_to_flash_string, sizeof(intent_to_write_to_flash_string), "C %s 268435836 %i\n", flash_address_as_string, 256);
 
-	txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);
-	
+	txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);	
 	txString("\n", sizeof("\n"), PRINT, 0);
 	Sleep(300);
 	rx(NO_PARSE, PRINT);
@@ -1759,6 +1690,27 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	return write_local;
 }
 
+struct Data pad_data_array(struct write write_local, struct Data data_local)
+{
+	// 1. Find start byte; take the index of data + 1.
+	// 2. Find the how many sectors will be needed in bytes.
+	// 3. Fill from start_byte to end_byte with FF.
+
+	int start_byte = 0;
+	int end_byte = 0;
+	
+	start_byte = data_local.HEX_array_size+1;
+	end_byte = (write_local.sectors_needed * 4096);
+	printf("%i %i\n", start_byte, end_byte);
+	for (int i = start_byte; i < end_byte; ++i)
+	{
+		data_local.HEX_array[i] = 0xFF;
+	}
+	
+	data_local.HEX_array_size = end_byte;
+	
+	return data_local;
+}
 
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string)
 {

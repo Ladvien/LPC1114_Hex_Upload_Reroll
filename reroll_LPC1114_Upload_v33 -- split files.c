@@ -2,8 +2,71 @@
 //popular FTDI breakouts, like Sparkfun's, to be used as a serial programmer for 
 //the LPC1114.  Shooting for no manual reset.
 
+#include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h> 
+#include <windows.h>
+#include <windef.h>
+#include <winnt.h>
+#include <winbase.h>
+#include <string.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include "ftd2xx.h"
+#include <sys/time.h>
 
-#include "main.h"
+
+//////////////////// Variables and Defines ////////////////////////////////////////////////////////
+
+//#define PIN_TX  0x01  /* Orange wire on FTDI cable */
+//#define PIX_RX  0x02  /* Yellow */
+//#define PIN_RTS 0x04  /* Green */
+#define PIN_CTS 0x08  /* Brown */
+#define PIN_DTR 0x10
+//#define PIN_DSR 0x20
+//#define PIN_DCD 0x40
+//#define PIN_RI  0x80
+
+// HM-10 OR HM-11 COMMANDS
+#define HM_RESET "AT+RESET"
+#define HM_ISP_LOW "AT+PIO30"
+#define HM_ISP_HIGH "AT+PIO31"
+#define HM_LPC_RESET_LOW "AT+PIO20"
+#define HM_LPC_RESET_HIGH "AT+PIO21"
+
+// LPC Commands
+#define LPC_CHECK "?"
+#define Synchronized "Synchronized\n"
+
+// FTDI
+#define FT_ATTEMPTS 5
+
+#define MAX_SIZE 32768
+#define MAX_SIZE_16 2048
+
+#define PRINT 1
+#define NO_PRINT 0
+#define PARSE 1
+#define NO_PARSE 0
+
+#define BLACK			0
+#define BLUE			1
+#define GREEN			2
+#define CYAN			3
+#define RED				4
+#define MAGENTA			5
+#define BROWN			6
+#define LIGHTGRAY		7
+#define DARKGRAY		8
+#define LIGHTBLUE		9
+#define LIGHTGREEN		10
+#define LIGHTCYAN		11
+#define LIGHTRED		12
+#define LIGHTMAGENTA	13
+#define YELLOW			14
+#define WHITE			15
+
 
 //Serial Port handle.
 //Used by FTD2XX
@@ -24,7 +87,6 @@ DWORD * ptr_bytes_written = &BytesWritten;
 FILE *fileIn;
 FILE *hexDataFile;
 FILE *UUEDataFile;
-FILE *debug;
 
 //Reading characters from a file.
 uint8_t charToPut;
@@ -33,6 +95,151 @@ uint8_t charToPut;
 int totalCharsRead = 0;
 
 int command_response_code = 0;
+
+struct write
+{
+	// Holds the raw hex data, straight from the file.
+	uint8_t UUE_chunk_A[256];
+	uint8_t UUE_chunk_B[256];
+
+	int UUE_chunk_A_check_sum;
+	int UUE_chunk_B_check_sum;
+
+	int UUE_chunk_A_bytes_to_write;
+	int UUE_chunk_B_bytes_to_write;
+	
+	int UUE_chunk_A_UUE_char_count;
+	int UUE_chunk_B_UUE_char_count;
+
+	int chunk_index;
+	
+	int bytes_loaded_A;
+	int bytes_loaded_B;
+	
+	int bytes_loaded_index;
+
+	int bytes_written;
+	// ISP uses RAM from 0x1000 017C to 0x1000 17F
+	uint32_t ram_address;
+
+	// Flash address.
+	uint32_t Flash_address;
+
+	int sectors_needed;
+	int sector_to_prepare;
+	int sector_to_write;
+	int sector_index;
+};
+
+struct Data
+{
+	// Holds the raw hex data, straight from the file.
+	uint8_t HEX_array[128000];
+	int HEX_array_size;
+};
+
+// States for FTDI state machine.
+typedef enum {
+    FTDI_SM_OPEN,
+   	FTDI_SM_RESET,
+    FTDI_SM_CLOSE,
+    FTDI_SM_ERROR,
+} FTDI_state;
+
+typedef enum  
+{
+	RESP_CMD_SUCCESS                   =  0,
+	RESP_INVALID_COMMAND               =  1,
+	RESP_SRC_ADDR_ERROR                =  2,
+	RESP_DST_ADDR_ERROR                =  3,
+	RESP_SRC_ADDR_NOT_MAPPED           =  4,
+	RESP_DST_ADDR_NOT_MAPPED           =  5,
+	RESP_COUNT_ERROR                   =  6,
+	RESP_INVALID_SECTOR                =  7,
+	RESP_SECTOR_NOT_BLANK              =  8,
+	RESP_SECTOR_NOT_PREPARED_FOR_WRITE_OPERATION  = 9,
+	RESP_COMPARE_ERROR                 = 10,
+	RESP_BUSY                          = 11,
+	RESP_PARAM_ERROR                   = 12,
+	RESP_ADDR_ERROR                    = 13,
+	RESP_ADDR_NOT_MAPPED               = 14,
+	RESP_CMD_LOCKED                    = 15,
+	RESP_INVALID_CODE                  = 16,
+	RESP_INVALID_BAUD_RATE             = 17,
+	RESP_INVALID_STOP_BIT              = 18,
+	RESP_CODE_READ_PROTECTION_ENABLED  = 19
+}CMD_RESPONSE;
+
+// States for RX state machine.
+typedef enum {
+	RX_NODATA,
+	RX_INCOMPLETE,
+	RX_COMPLETE,
+	RX_COMP_AND_INC_DATA,
+	RX_ERROR,
+} RX_state;
+
+//////////////////// Forward Declaration ////////////////////////////////////////////////////////////
+
+// FTDI
+uint8_t rx(bool parse, bool printOrNot);
+uint8_t parserx();
+uint8_t utxString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
+uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
+int FTDI_State_Machine(int state, int FT_Attempts);
+
+// Output files, for debugging purposes.
+void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int hexDataCharCount);
+void writeHexDataTofile(struct Data data_local);
+static FILE *open_file ( char *file, char *mode );
+int fileSizer();
+
+// LPC handling
+uint8_t set_ISP_mode(int print);
+uint8_t get_LPC_Info(bool print);
+void command_response();
+void OK();
+void Failed();
+
+
+// HM-11 commands
+void wake_devices();
+void check_HM_10();
+
+
+// Data Handling
+struct Data hex_file_to_array(struct Data data_local, int file_size);
+int check_sum(uint8_t * hex_data_array, int file_size);
+int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_array_size);
+uint8_t readByte();
+void clearSpecChar();
+static uint8_t Ascii2Hex(uint8_t c);
+void copy_string(uint8_t *target, uint8_t *source);
+int tx_size(uint8_t * string);
+
+// Debugging and Print Handling.
+void clearBuffers();
+void setTextRed();
+void setTextGreen();
+void setColor(int ForgC, int BackC);
+void clearConsole();
+void startScreen();
+
+// Write to RAM.
+int prepare_sectors(int sectors);
+int sectors_needed(int hex_data_array_size);
+struct write write_page_to_ram(struct write write_local, struct Data data_local);
+struct write prepare_page_to_write(struct write write_local, struct Data data_local);
+struct write ram_to_flash(struct write write_local, struct Data data_local);
+void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
+struct write erase_chip(struct write write_local);
+struct Data pad_data_array(struct write write_local, struct Data data_local);
+
+// Timers
+float timer();
+void usleep(__int64 usec);
+
+
 
 ///////////////////// PROGRAM ////////////////////////////
 ////////////////////// START /////////////////////////////
@@ -66,9 +273,7 @@ int main(int argc, uint8_t *argv[])
 
 	struct Data data;
 	struct write write;
-	
-	debug = open_file ("debug.hex", "w" );
-	
+
 	// ISP uses RAM from 0x1000 017C to 0x1000 17F
 	write.ram_address = 0x1000017C;
 
@@ -101,8 +306,10 @@ int main(int argc, uint8_t *argv[])
 
 	// Load the data from file
 	data = hex_file_to_array(data, fileSize);
-	
 	write.sectors_needed = sectors_needed(data.HEX_array_size);
+	
+	// Pad sector with FF's.
+	data = pad_data_array(write, data);
 
 	// Start with last sector needed.
 	write.sector_index = (write.sectors_needed - 1);
@@ -143,12 +350,12 @@ int main(int argc, uint8_t *argv[])
 	txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
 	Sleep(120);
 	rx(PARSE, PRINT);
-
+	
 	// Clear the entire chip.
 	erase_chip(write);
 
-	validity_checksum(write, data);
 
+	
 	// Sectors
 	// 16 pages (128) * # of sectors (4096)
 	for (int i = 0; i < (16 * write.sectors_needed); ++i)
@@ -161,7 +368,6 @@ int main(int argc, uint8_t *argv[])
 
 	printf("\n\nUpload time in seconds: %.3f\n", timer());
 
-	set_RUN_mode(NO_PRINT);
 	/*
 	// Read memory
 	txString("R 268436224 4\n", sizeof("R 268436224 4\n"), PRINT, 0);
@@ -171,13 +377,24 @@ int main(int argc, uint8_t *argv[])
 	Sleep(500);
 	rx(PARSE, PRINT);
 
+	// Read memory
+	txString("R 268436224 4\n", sizeof("R 268436224 4\n"), 0);
+	Sleep(500);
+	rx(NO000, rxString);
+	txString("OK\n", sizeof("OK\n"), 0);
+	Sleep(500);
+	rx(NO000, rxString);
+
+	//txString("#0V%T\n", sizeof("#0V%T\n"), 0);
+	//Sleep(500);
+	//rx(NO000, rxString);
 	*/
 
 	//Close files.
 	fclose ( fileIn );
 	fclose ( UUEDataFile );
 	fclose ( hexDataFile );
-	fclose ( debug );
+
 	clearConsole();
 } // END PROGRAM
 
@@ -212,7 +429,6 @@ uint8_t rx(bool parse, bool printOrNot)
 			
 			if(printOrNot)
 			{
-				fprintf(debug, "%s", ParsedRxBuffer);	
 				setTextGreen();
 				printf("%s\n", ParsedRxBuffer);
 				clearConsole();
@@ -277,7 +493,6 @@ uint8_t parserx()
 			command_response_bfr[0] = ParsedRxBuffer[0];
 			command_response_bfr[1] = ParsedRxBuffer[1];
 			command_response_code = atoi(command_response_bfr);
-			//command_response(command_response);
 			successful = 1;
 		}
 
@@ -318,8 +533,8 @@ uint8_t utxString(uint8_t string[], int txString_size, bool printOrNot, int freq
 	for (int i = 0; i < (txString_size-1); i++){
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
 		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
-		Sleep(frequency_of_tx_char);
-		fprintf(debug, "%c", string[i]);	
+		usleep(frequency_of_tx_char);
+
 		while((txString_size) < *ptr_bytes_written){Sleep(1000);}
 		 
 		if(printOrNot)
@@ -339,7 +554,7 @@ uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequ
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
 		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
 		Sleep(frequency_of_tx_char);
-		fprintf(debug, "%c", string[i]);	
+
 		while((txString_size) < *ptr_bytes_written){Sleep(1000);}
 		
 		if(printOrNot)
@@ -500,9 +715,229 @@ int fileSizer()
 }
 
 
+///////////// LPC Handling ///////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
 
+uint8_t set_ISP_mode(int print)
+{
+	// Remotely set LPC into ISP mode.
 
+	// Test completeness of command.
+	int successful = 0;
 
+	printf("Starting LPC ISP.");
+
+	// Let's attempt 3x to successfully set ISP mode
+	for (int i = 0; i < 5; ++i)
+	{	
+		txString(HM_ISP_LOW, sizeof(HM_ISP_LOW), print, 0);
+		Sleep(100);
+		successful += rx(PARSE, print);
+		printf(".");
+
+		txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
+		Sleep(100);
+		successful += rx(PARSE, print);
+		printf(".");
+		
+		txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
+		Sleep(100);
+		successful += rx(PARSE, print);
+		printf(".");
+
+		txString(HM_ISP_HIGH, sizeof(HM_ISP_HIGH), print, 0);
+		Sleep(100);
+		successful += rx(PARSE, print);
+		printf(".");
+		
+		// Synchronized check.
+		txString(LPC_CHECK, sizeof(LPC_CHECK), print, 0);
+		Sleep(100);
+		successful += rx(PARSE, print);
+		printf(".");
+
+		// Tell the LPC we are synchronized.
+		txString(Synchronized, sizeof(Synchronized), print, 0);
+		Sleep(100);
+		successful += rx(PARSE, print);
+		printf(".");
+
+		// Set crystal
+		txString("12000\n", sizeof("12000\n"), print, 0);
+		Sleep(100);
+		successful += rx(PARSE, print);
+		printf(".");
+
+		// Let's turn off ECHO.
+		txString("A 0\n", sizeof("A 0\n"), print, 10);
+		Sleep(100);
+		rx(PARSE, print);		
+		printf(".");
+
+		// Set baud
+		//txString("9600\n", sizeof("9600\n"), 0);
+		//Sleep(500);
+		//setTextGreen();
+		//printf("%s\n", ParsedRxBuffer);
+
+		Sleep(100);
+
+		// If all the HM-10 commands responded then
+		// the ISP mode should successfully be set.
+		if (successful > 6)
+		{
+			OK();
+			return 1;	
+		}
+		// Let's try 3x.
+		else
+		{
+			Failed();
+			successful = 0;
+			printf("Retrying.");
+			clearBuffers();
+			Sleep(500);
+		}
+	}
+	// RETURN NOTHING!
+	return 0;
+}
+
+uint8_t get_LPC_Info(bool print)
+{
+	int successful = 0;
+	uint8_t PartID[256];
+	uint8_t UID[256];
+	uint8_t BootVersion[256];
+
+	for (int i = 0; i < 3; ++i)
+	{	
+		// Read Part ID
+		txString("N\n", sizeof("N\n"), print, 0);
+		Sleep(500);
+		successful += rx(PARSE, print);
+		copy_string(PartID, ParsedRxBuffer);
+		
+		// Read UID
+		txString("J\n", sizeof("J\n"), print, 0);
+		Sleep(500);
+		successful += rx(PARSE, print);
+		copy_string(UID, ParsedRxBuffer);
+
+		// Boot Version
+		txString("K\n", sizeof("K\n"), print, 0);
+		Sleep(500);
+		successful += rx(PARSE, print);
+		copy_string(BootVersion, ParsedRxBuffer);
+		
+
+		clearConsole();
+
+		if (successful > 2)
+		{
+			printf("Device info successfully read: \n\n");
+			printf("Boot Version: %s\n", BootVersion);
+			printf("UID:          %s\n", UID);
+			printf("Part Number:  %s\n", PartID);
+			break;	
+		}
+		else
+		{
+			successful = 0;
+			printf("Attempt %i to get LPC info and failed. Retrying...%s\n", i);
+			clearBuffers();
+			Sleep(500);
+		}
+	}
+
+}
+
+void command_response()
+{
+	// Pulls from global command_reponse_code, which is
+	// set in parseRx().
+	switch(command_response_code)
+	{
+		// 0
+		case RESP_CMD_SUCCESS:
+			printf("Command Success");
+			break;
+		// 1
+		case RESP_INVALID_COMMAND:
+			printf("Invalid Command");
+			break;
+		// 2
+		case RESP_SRC_ADDR_ERROR:
+			printf("Source Address Error");
+			break;
+		// 3
+		case RESP_SRC_ADDR_NOT_MAPPED:
+			printf("Source Address Not Mapped");
+			break;
+		// 4
+		case RESP_DST_ADDR_NOT_MAPPED:
+			printf("Destination Address Not Mapped");
+			break;
+		// 5
+		case RESP_COUNT_ERROR:
+			printf("Count Error");
+			break;
+		// 6
+		case RESP_INVALID_SECTOR:
+			printf("Invalid Sector");
+			break;
+		// 7
+		case RESP_SECTOR_NOT_BLANK:
+			printf("Sector Not Blank");
+			break;
+		// 8
+		case RESP_SECTOR_NOT_PREPARED_FOR_WRITE_OPERATION:
+			printf("Sector Not Prepared for Write Operation");
+			break;
+		// 9
+		case RESP_COMPARE_ERROR:
+			printf("Compare Error");
+			break;
+		// 10
+		case RESP_BUSY:
+			printf("Busy");
+			break;
+		// 11
+		case RESP_PARAM_ERROR:
+			printf("Parameter Error");
+			break;
+		// 12
+		case RESP_ADDR_ERROR:
+			printf("Address Error");
+			break;
+		// 13
+		case RESP_ADDR_NOT_MAPPED:
+			printf("Address Not Mapped");
+			break;
+		// 14
+		case RESP_CMD_LOCKED:
+			printf("Command Locked");
+			break;
+		// 15
+		case RESP_INVALID_CODE:
+			printf("Invalid Code");
+			break;
+		// 16
+		case RESP_INVALID_BAUD_RATE:
+			printf("Invalid Baud Rate");
+			break;
+		// 17
+		case RESP_INVALID_STOP_BIT:
+			printf("Invalid Stop Bit");
+			break;
+		// 18
+		case RESP_CODE_READ_PROTECTION_ENABLED:
+			printf("Code Read Protection Enabled");
+			break;			
+	}
+	// Clear for next use.
+	command_response_code = 0;
+}
 
 void OK()
 {
@@ -518,9 +953,74 @@ void Failed()
 	clearConsole();	
 }
 
+void wake_devices()
+{
+	// Meant to activate UART flow on devices
+	txString("Wake", sizeof("Wake"), NO_PRINT, 10);
+	Sleep(500);
+	rx(NO_PARSE, PRINT);
+	printf("Waking Devices...\n");
+}
 
+void check_HM_10()
+{
+	// Determine if the HM-10 signal is strong enough
+	// to attempt an upload.
+	uint8_t char_RSSI[2];
+	int int_RSSI = 0;
 
+	// An HM-10 command to get RSSI.
+	txString("AT+RSSI?", sizeof("AT+RSSI?"), NO_PRINT, 0);
+	Sleep(500);
 
+	FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
+
+	if (RxBytes > 0) {
+		FT_status = FT_Read(handle,RawRxBuffer,RxBytes,&BytesReceived);
+	}
+	else
+	{
+		// Bad RSSI read.
+	}		
+	
+	if(sizeof(RawRxBuffer) < 10)
+	{
+		char_RSSI[0] = 0;
+		char_RSSI[1] = RawRxBuffer[8];
+		char_RSSI[2] = RawRxBuffer[8];	
+	}
+	else if (sizeof(RawRxBuffer) > 9)
+	{
+		char_RSSI[0] = RawRxBuffer[8];
+		char_RSSI[1] = RawRxBuffer[9];
+		char_RSSI[2] = RawRxBuffer[10];	
+	}
+	
+	int_RSSI = atoi(char_RSSI);
+	//sscanf(char_RSSI, "%D", &int_RSSI);
+
+	if (int_RSSI > 30 && int_RSSI < 60)
+	{
+ 		clearConsole();
+		printf("HM-10 signal: ");
+		setTextGreen();
+		printf("Strong\n");		
+	}
+	else if (int_RSSI > 60 && int_RSSI < 90)
+	{
+		clearConsole();
+		printf("HM-10 signal: ");
+		printf("Medium\n");	
+	}
+	else if (int_RSSI > 90 && int_RSSI < 120)
+	{
+		clearConsole();
+		printf("HM-10 signal: ");
+		setTextRed();
+		printf("Weak\n");		
+	}
+	clearConsole();
+}
 
 
 // Data Handling
@@ -602,7 +1102,7 @@ struct Data hex_file_to_array(struct Data data_local, int file_size)
 		data_local.HEX_array[data_local.HEX_array_size] = ' ';
 		data_local.HEX_array_size++;
 	}
-
+	
 	return data_local;
 }
 
@@ -640,6 +1140,7 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 		//printf("%02X ", hex_data_array[i]);
 	}
 	
+
 	// 1. Add char for characters per line.
 	if(hex_data_array_size < 45)
 	{
@@ -648,6 +1149,7 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 	else
 	{
 		UUE_data_array[UUE_encoded_string_index] = 'M';
+
 	}
 
 	UUE_encoded_string_index++;
@@ -672,6 +1174,7 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 			}
 			uue_length_char_index--;
 		}
+		
 
 		// 3. Encode array.
 		uue_char[0] = ((byte_to_encode[0] >> 2) & 0x3f);
@@ -759,6 +1262,7 @@ void clearSpecChar()
 	}
 }
 
+
 //Copied in from lpc21isp.c
 static uint8_t Ascii2Hex(uint8_t c)
 {
@@ -808,7 +1312,7 @@ void clearBuffers()
 		ParsedRxBuffer[i] = 0;
 	}
 
-	// Clear RawRxBuffer
+		// Clear RawRxBuffer
 	for (int i = 0; i != sizeof(RawRxBuffer); ++i)
 	{
 		RawRxBuffer[i] = 0;
@@ -865,50 +1369,14 @@ int sectors_needed(int hex_data_array_size)
 int prepare_sectors(int sectors)
 {
 	uint8_t sectors_needed_string[128];
-	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P %i %i\n", sectors-1, sectors-1);
+	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P %i %i\n", sectors-2, sectors-1);
 	txString(sectors_needed_string, tx_size(sectors_needed_string), PRINT, 0);
 	txString("\n", sizeof("\n"), PRINT, 0);
+	rx(PARSE, PRINT);
 	Sleep(300);
-	rx(PARSE, PRINT);		
-}
+	printf("Sectors prepared: # ");
+	rx(PARSE, PRINT);
 
-struct write validity_checksum(struct write write_local, struct Data data_local)
-{
-	// 1. Read vector table (bytes) 0-6
-	// 2. Add the 32 bit words together.
-	// 3. Take the sum and create two's complement.
-	// 4. Insert this in the 8th word.
-
-	uint32_t chck_sum_array[8];
-	uint32_t check_sum = 0;
-	uint32_t word = 0;
-	uint32_t validity_sum = 0;
-
-	// Little Endian
-	for (int i = 0; i < 28; i+=4)
-	{
-		chck_sum_array[i/4] = data_local.HEX_array[i] + (data_local.HEX_array[i+1] << 8) + (data_local.HEX_array[i+2] << 16) + (data_local.HEX_array[i+3] << 24);
-	}
-
-	for (int i = 0; i < 7; ++i)
-	{
-		check_sum += chck_sum_array[i];
-	}
-
-	check_sum = (~check_sum) + 1;
-	data_local.HEX_array[28] = check_sum & 0xff;
-	data_local.HEX_array[29] = (check_sum >>8 ) & 0xff;
-	data_local.HEX_array[30] = (check_sum>>16) & 0xff;
-	data_local.HEX_array[31] = (check_sum>>24) & 0xff;
-
-	for (int i = 0; i < 31; i+=4)
-	{
-		word = data_local.HEX_array[i] + (data_local.HEX_array[i+1] << 8) + (data_local.HEX_array[i+2] << 16) + (data_local.HEX_array[i+3] << 24);
-		validity_sum += word;
-	}
-
-	printf("Validity sum: %lu\n", validity_sum);
-	
 }
 
 // Write to RAM.
@@ -959,27 +1427,26 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	// Loops until succeeded.
 	while(successful < 3){
 		// 3. Send intent-to-write string.
-		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), PRINT, 0);
+		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), NO_PRINT, 0);
 		txString("\n", sizeof("\n"), NO_PRINT, 0);
 		Sleep(100);
 		rx(PARSE, PRINT);
 
 		// 4. Send chunk_A of data: "DATA\n"
-		txString(write_local.UUE_chunk_A, write_local.UUE_chunk_A_UUE_char_count, PRINT, slow_down);
+		utxString(write_local.UUE_chunk_A, write_local.UUE_chunk_A_UUE_char_count, NO_PRINT, slow_down);
 		Sleep(300);	
 		txString("\n", sizeof("\n"), NO_PRINT, 0);
 
 		// 5. Send checksum: "Chk_sum\n"
 		snprintf(checksum_as_string, 10, "%i\n", write_local.UUE_chunk_A_check_sum);
-		txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
-		Sleep(140);
+		txString(checksum_as_string, tx_size(checksum_as_string), NO_PRINT, 0);
+		txString("\n", sizeof("\n"), NO_PRINT, 0);
+		Sleep(110);
 	
 		// 6. Read response from LPC.
 		successful = rx(PARSE, PRINT);
 		write_attempt++;	
 
-		slow_down += 1;
 		// 8. Repeat write if necessary.
 	} // Loop if fail.
 	if (successful == 3)
@@ -1015,20 +1482,20 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	// Loops until succeeded.
 	while(successful < 3){
 		// 3. Send intent-to-write string.
-		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), PRINT, 0);
+		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), NO_PRINT, 0);
 		txString("\n", sizeof("\n"), NO_PRINT, 0);
 		Sleep(100);
 		rx(PARSE, PRINT);
 
 		// 4. Send chunk_A of data: "DATA\n"
-		utxString(write_local.UUE_chunk_B, write_local.UUE_chunk_B_UUE_char_count, PRINT, slow_down);
-		Sleep(200);	
-		txString("\n", sizeof("\n"), PRINT, 0);
+		utxString(write_local.UUE_chunk_B, write_local.UUE_chunk_B_UUE_char_count, NO_PRINT, slow_down);
+		Sleep(150);	
+		txString("\n", sizeof("\n"), NO_PRINT, 0);
 
 		// 5. Send checksum: "Chk_sum\n"
 		snprintf(checksum_as_string, 10, "%i\n", write_local.UUE_chunk_B_check_sum);
 		txString(checksum_as_string, tx_size(checksum_as_string), NO_PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
+		txString("\n", sizeof("\n"), NO_PRINT, 0);
 		Sleep(110);
 	
 		// 6. Read response from LPC.
@@ -1064,7 +1531,6 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	return write_local;
 }
 
-
 struct write prepare_page_to_write(struct write write_local, struct Data data_local)
 {
 	
@@ -1078,7 +1544,7 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	uint8_t HEX_chunkB_array_buf[128];
 
 	// 0. Load arrays with FF.
-	for (int i = 0; i < 128; ++i)
+	for (int i = 128; i > 0; --i)
 	{
 		HEX_chunkA_array_buf[i] = 0xFF;
 		HEX_chunkB_array_buf[i] = 0xFF;	
@@ -1087,7 +1553,7 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	// 1. Load hex data into array A & get #bytes.
 	
 	// CHUNK A
-	for (int i = 0; i < 128; ++i)
+	for (int i = 128; i > 0; --i)
 	{
 		if (write_local.bytes_loaded_A < data_local.HEX_array_size)
 		{
@@ -1149,18 +1615,21 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 
 struct write erase_chip(struct write write_local)
 {
-		uint8_t sectors_needed_string[128];
-		snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P 0 7\n");
-		txString(sectors_needed_string, tx_size(sectors_needed_string), PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
-		rx(PARSE, PRINT);
-		Sleep(300);
-		
-		rx(PARSE, PRINT);
-		txString("E 0 1 2 3 4 5 6 7", sizeof("E 0 1 2 3 4 5 6 7"), PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
-		Sleep(200);
-		rx(PARSE, PRINT);
+	uint8_t sectors_needed_string[128];
+
+	// THIS WILL NEED TO BE MODIFIED FOR OTHER CHIPS.
+	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P 0 7\n");
+	txString(sectors_needed_string, tx_size(sectors_needed_string), NO_PRINT, 0);
+	txString("\n", sizeof("\n"), NO_PRINT, 0);
+	rx(PARSE, PRINT);
+	Sleep(300);
+	printf("Sectors prepared: # ");
+	rx(PARSE, PRINT);		
+
+	txString("E 0 1 2 3 4 5 6 7", sizeof("E 0 1 2 3 4 5 6 7"), NO_PRINT, 0);
+	txString("\n", sizeof("\n"), NO_PRINT, 0);
+	Sleep(300);
+	rx(PARSE, PRINT);
 
 }
 
@@ -1176,16 +1645,12 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	// Used to determine sector ( 32 * 128 = 4096)
 	static int page_index;
 	
-	printf("write_local.Flash_address %02X\n", write_local.Flash_address);
+
+
 	// 0. Point to current sector.
 	if (page_index == 16)
 	{
-
 		write_local.sector_index--;
-		if(write_local.sector_index < 0)
-		{
-			write_local.sector_index = 0;
-		}
 		write_local.chunk_index = 0;
 		write_local.Flash_address = (write_local.sector_index * 4096);
 		printf("%02X\n", write_local.Flash_address);
@@ -1210,11 +1675,10 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
 	snprintf(intent_to_write_to_flash_string, sizeof(intent_to_write_to_flash_string), "C %s 268435836 %i\n", flash_address_as_string, 256);
 
-	txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);
-	
+	txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);	
 	txString("\n", sizeof("\n"), PRINT, 0);
 	Sleep(300);
-	rx(PARSE, PRINT);
+	rx(NO_PARSE, PRINT);
 
 	//printf("%s\n", intent_to_write_to_flash_string);
 	//printf("\n\n\n");
@@ -1226,6 +1690,27 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	return write_local;
 }
 
+struct Data pad_data_array(struct write write_local, struct Data data_local)
+{
+	// 1. Find start byte; take the index of data + 1.
+	// 2. Find the how many sectors will be needed in bytes.
+	// 3. Fill from start_byte to end_byte with FF.
+
+	int start_byte = 0;
+	int end_byte = 0;
+	
+	start_byte = data_local.HEX_array_size+1;
+	end_byte = (write_local.sectors_needed * 4096);
+	printf("%i %i\n", start_byte, end_byte);
+	for (int i = start_byte; i < end_byte; ++i)
+	{
+		data_local.HEX_array[i] = 0xFF;
+	}
+	
+	data_local.HEX_array_size = end_byte;
+	
+	return data_local;
+}
 
 void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string)
 {

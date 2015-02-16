@@ -1,8 +1,6 @@
 //LPC1114 Reset program.  Meant to come before using lpc21isp.  Should allow for 
 //popular FTDI breakouts, like Sparkfun's, to be used as a serial programmer for 
 //the LPC1114.  Shooting for no manual reset.
-
-
 #include "main.h"
 
 

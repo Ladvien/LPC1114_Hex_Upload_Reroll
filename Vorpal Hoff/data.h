@@ -25,8 +25,9 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 int check_sum(uint8_t * hex_data_array, int file_size);
 uint8_t readByte();
 void clearSpecChar();
-static uint8_t Ascii2Hex(uint8_t c);
+uint8_t Ascii2Hex(uint8_t c);
 void copy_string(uint8_t *target, uint8_t *source);
-int tx_size(uint8_t * string);
+int tx_size_unsigned(uint8_t * string);
+int tx_size_signed(char * string);
 
 #endif /* DEVICES */

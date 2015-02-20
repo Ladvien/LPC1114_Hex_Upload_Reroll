@@ -16,6 +16,7 @@
 #include <sys/time.h>
 #include "devices.h"
 #include "data.h"
+#include <inttypes.h>
 
 //////////////////// Variables and Defines ////////////////////////////////////////////////////////
 
@@ -151,14 +152,14 @@ typedef enum {
 // FTDI
 uint8_t rx(bool parse, bool printOrNot);
 uint8_t parserx();
-uint8_t utxString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
-uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
+uint8_t tx_chars(char string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
+uint8_t tx_data(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
 int FTDI_State_Machine(int state, int FT_Attempts);
 
 // Output files, for debugging purposes.
 void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int hexDataCharCount);
 void writeHexDataTofile(struct Data data_local);
-static FILE *open_file ( char *file, char *mode );
+FILE *open_file ( char *file, char *mode );
 
 
 void OK();
@@ -178,7 +179,7 @@ int sectors_needed(int hex_data_array_size);
 struct write write_page_to_ram(struct write write_local, struct Data data_local);
 struct write prepare_page_to_write(struct write write_local, struct Data data_local);
 struct write ram_to_flash(struct write write_local, struct Data data_local);
-void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
+void convert_32_hex_address_to_string(uint32_t address, char * address_as_string);
 struct write erase_chip(struct write write_local);
 struct write validity_checksum(struct write write_local, struct Data data_local);
 

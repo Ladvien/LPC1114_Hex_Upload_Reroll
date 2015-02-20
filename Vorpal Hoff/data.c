@@ -241,8 +241,8 @@ int check_sum(uint8_t * hex_data_array, int hex_data_array_size)
 
 uint8_t readByte(){
 	//Holds combined nibbles.
-	uint8_t ASCII_hexvalue[3];
-	uint8_t hex_hexvalue;
+	char ASCII_hexvalue[3];
+	char hex_hexvalue;
 	char * pEnd;
 
 	//Put first nibble in.
@@ -263,3 +263,22 @@ uint8_t readByte(){
 	
 	return hex_hexvalue;	
 }
+
+//Copied in from lpc21isp.c
+uint8_t Ascii2Hex(uint8_t c)
+{
+	if (c >= '0' && c <= '9')
+	{
+		return (uint8_t)(c - '0');
+	}
+	if (c >= 'A' && c <= 'F')
+	{
+		return (uint8_t)(c - 'A' + 10);
+	}
+	if (c >= 'a' && c <= 'f')
+	{
+        return (uint8_t)(c - 'A' + 10);
+	}
+	//printf("\n !!! Bad Character: %02X in file at totalCharsRead=%d !!!\n\n", c, totalCharsRead);
+	return 0;  // this "return" will never be reached, but some compilers give a warning if it is not present
+} 

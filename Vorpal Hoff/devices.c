@@ -17,7 +17,7 @@ extern uint8_t ParsedRxBuffer[2048];
 void wake_devices()
 {
 	// Meant to activate UART flow on devices
-	txString("Wake", sizeof("Wake"), NO_PRINT, 10);
+	tx_chars("Wake", sizeof("Wake"), NO_PRINT, 10);
 	Sleep(500);
 	rx(NO_PARSE, PRINT);
 	printf("Waking Devices...\n");
@@ -27,11 +27,11 @@ void check_HM_10()
 {
 	// Determine if the HM-10 signal is strong enough
 	// to attempt an upload.
-	uint8_t char_RSSI[2];
+	char char_RSSI[2];
 	int int_RSSI = 0;
 
 	// An HM-10 command to get RSSI.
-	txString("AT+RSSI?", sizeof("AT+RSSI?"), NO_PRINT, 0);
+	tx_chars("AT+RSSI?", sizeof("AT+RSSI?"), NO_PRINT, 0);
 	Sleep(500);
 
 	FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
@@ -83,7 +83,7 @@ void check_HM_10()
 	clearConsole();
 }
 
-uint8_t set_ISP_mode(int print)
+int set_ISP_mode(int print)
 {
 	// Remotely set LPC into ISP mode.
 
@@ -96,49 +96,49 @@ uint8_t set_ISP_mode(int print)
 	for (int i = 0; i < 5; ++i)
 	{	
 		// "AT+PIO30"
-		txString(HM_ISP_LOW, sizeof(HM_ISP_LOW), print, 0);
+		tx_chars(HM_ISP_LOW, sizeof(HM_ISP_LOW), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
 
 		// "AT+PIO20"
-		txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
+		tx_chars(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
 		
 		// "AT+PIO21"
-		txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
+		tx_chars(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
 		
 		// Synchronized check.
-		txString(LPC_CHECK, sizeof(LPC_CHECK), print, 0);
+		tx_chars(LPC_CHECK, sizeof(LPC_CHECK), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
 
 		// Tell the LPC we are synchronized.
-		txString(Synchronized, sizeof(Synchronized), print, 0);
+		tx_chars(Synchronized, sizeof(Synchronized), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
 
 		// Set crystal
-		txString("12000\n", sizeof("12000\n"), print, 0);
+		tx_chars("12000\n", sizeof("12000\n"), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
 
 		// Let's turn off ECHO.
-		txString("A 0\n", sizeof("A 0\n"), print, 10);
+		tx_chars("A 0\n", sizeof("A 0\n"), print, 10);
 		Sleep(100);
 		rx(PARSE, print);		
 		printf(".");
 
 		// Set baud
-		//txString("9600\n", sizeof("9600\n"), 0);
+		//tx_chars("9600\n", sizeof("9600\n"), 0);
 		//Sleep(500);
 		//setTextGreen();
 		//printf("%s\n", ParsedRxBuffer);
@@ -162,11 +162,10 @@ uint8_t set_ISP_mode(int print)
 			Sleep(500);
 		}
 	}
-	// RETURN NOTHING!
 	return 0;
 }
 
-uint8_t set_RUN_mode(int print)
+int set_RUN_mode(int print)
 {
 	// Remotely set LPC into ISP mode.
 
@@ -179,19 +178,19 @@ uint8_t set_RUN_mode(int print)
 	for (int i = 0; i < 5; ++i)
 	{	
 		// "AT+PIO31"
-		txString(HM_ISP_HIGH, sizeof(HM_ISP_HIGH), print, 0);
+		tx_chars(HM_ISP_HIGH, sizeof(HM_ISP_HIGH), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
 
 		// "AT+PIO20"
-		txString(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
+		tx_chars(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
 		
 		// "AT+PIO21"
-		txString(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
+		tx_chars(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
 		Sleep(100);
 		successful += rx(PARSE, print);
 		printf(".");
@@ -212,11 +211,10 @@ uint8_t set_RUN_mode(int print)
 			Sleep(500);
 		}
 	}
-	// RETURN NOTHING!
 	return 0;
 }
 
-uint8_t get_LPC_Info(bool print)
+void get_LPC_Info(bool print)
 {
 	int successful = 0;
 	uint8_t PartID[256];
@@ -226,19 +224,19 @@ uint8_t get_LPC_Info(bool print)
 	for (int i = 0; i < 3; ++i)
 	{	
 		// Read Part ID
-		txString("N\n", sizeof("N\n"), print, 0);
+		tx_chars("N\n", sizeof("N\n"), print, 0);
 		Sleep(500);
 		successful += rx(PARSE, print);
 		copy_string(PartID, ParsedRxBuffer);
 		
 		// Read UID
-		txString("J\n", sizeof("J\n"), print, 0);
+		tx_chars("J\n", sizeof("J\n"), print, 0);
 		Sleep(500);
 		successful += rx(PARSE, print);
 		copy_string(UID, ParsedRxBuffer);
 
 		// Boot Version
-		txString("K\n", sizeof("K\n"), print, 0);
+		tx_chars("K\n", sizeof("K\n"), print, 0);
 		Sleep(500);
 		successful += rx(PARSE, print);
 		copy_string(BootVersion, ParsedRxBuffer);
@@ -257,11 +255,12 @@ uint8_t get_LPC_Info(bool print)
 		else
 		{
 			successful = 0;
-			printf("Attempt %i to get LPC info and failed. Retrying...%s\n", i);
+			printf("Attempt %i to get LPC info and failed. Retrying.\n", i);
 			clearBuffers();
 			Sleep(500);
 		}
 	}
+
 
 }
 

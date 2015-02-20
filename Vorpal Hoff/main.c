@@ -13,8 +13,8 @@ DWORD TxBytes;
 DWORD BytesWritten;
 DWORD RxBytes;
 DWORD BytesReceived;
-uint8_t RawRxBuffer[2048];
-uint8_t ParsedRxBuffer[2048];
+char RawRxBuffer[2048];
+char ParsedRxBuffer[2048];
 
 DWORD * ptr_bytes_written = &BytesWritten;
 
@@ -35,7 +35,7 @@ int command_response_code = 0;
 ///////////////////// PROGRAM ////////////////////////////
 ////////////////////// START /////////////////////////////
 
-int main(int argc, uint8_t *argv[])
+int main(int argc, char *argv[])
 {
 	timer();
 
@@ -44,23 +44,14 @@ int main(int argc, uint8_t *argv[])
 	startScreen();	
 
 	//For setting state of DTR/CTS.
-	uint8_t DTR_Switch;
-	uint8_t CTS_Switch;
+	//uint8_t DTR_Switch;
+	//uint8_t CTS_Switch;
 
 	// Holds the raw hex data, straight from the file.
-	uint8_t hex_data_array[MAX_SIZE];
 	uint8_t UUE_data_array[MAX_SIZE];
+
 	// Stores file size.
 	int fileSize = 0;
-
-	// Dimesions of write data.
-	uint8_t uue_pages_or_scrap_array[1024];
-	int hex_data_array_size = 0;
-	int UUE_data_array_size = 0;
-	int uue_pages_or_scrap_char_count = 0;
-	int number_of_bytes_to_write = 0;
-	int pages_or_scrap_check_sum = 0;
-	int bytes_written = 0;
 
 	struct Data data;
 	struct write write;
@@ -138,7 +129,7 @@ int main(int argc, uint8_t *argv[])
 	//txString(HM_RESET, sizeof(HM_RESET), PRINT, 0);
 	
 	// Send Unlock Code
-	txString("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
+	tx_chars("U 23130\n", sizeof("U 23130\n"), PRINT, 0);
 	Sleep(120);
 	rx(PARSE, PRINT);
 
@@ -202,7 +193,7 @@ uint8_t rx(bool parse, bool printOrNot)
 			}
 			else
 			{
-				strcpy(ParsedRxBuffer, RawRxBuffer);
+				memcpy(ParsedRxBuffer, RawRxBuffer, sizeof(RawRxBuffer)+1);
 				device_and_success = 1;
 			}
 
@@ -237,11 +228,10 @@ uint8_t parserx()
 		int successful = 0;
 		
 		// Does the RawRxBuffer contain an CR LF string?
-		uint8_t *CR_LF_CHK = strstr(RawRxBuffer, "\r\n");
-		uint8_t *LF_CHK = strstr(RawRxBuffer, "\n");
-		uint8_t *OK_RES_LPC = strstr(RawRxBuffer, "OK");
+		char *CR_LF_CHK = strstr(RawRxBuffer, "\r\n");
+		char *OK_RES_LPC = strstr(RawRxBuffer, "OK");
 
-		uint8_t command_response_bfr[2];
+		char command_response_bfr[2];
 
 		// Clear ParsedRxBuffer.
 		for (int i = 0; i != sizeof(ParsedRxBuffer); ++i)
@@ -253,7 +243,7 @@ uint8_t parserx()
 		if(CR_LF_CHK != '\0')
 		{
 			// Load the Raw RX into the Parsed Rx.
-			strcpy(ParsedRxBuffer, RawRxBuffer);
+			memcpy(ParsedRxBuffer, RawRxBuffer, sizeof(RawRxBuffer)+1);
 			
 			// If the LPC responds, we want to remove CR and LF.
 			// Let's replace CR LF with "  ".
@@ -282,14 +272,14 @@ uint8_t parserx()
 		// Is it an HM-10?
 		else if (RawRxBuffer[0] == 'O' && RawRxBuffer[1] == 'K' && RawRxBuffer[2] == '+')
 		{
-			strcpy(ParsedRxBuffer, RawRxBuffer);
+			memcpy(ParsedRxBuffer, RawRxBuffer, sizeof(RawRxBuffer)+1);
 			// HM-10 responded.
 			successful=2;
 		}
 		// Is it a command response from LPC?
 		if (OK_RES_LPC != '\0')
 		{
-			strcpy(ParsedRxBuffer, RawRxBuffer);
+			memcpy(ParsedRxBuffer, RawRxBuffer, sizeof(RawRxBuffer)+1);
 			// HM-10 responded.
 			successful=3;
 		}
@@ -297,7 +287,7 @@ uint8_t parserx()
 		// If the RawRxBuffer data does not contain "\r\n" or "OK+" strings.
 		else
 		{
-			strcpy(ParsedRxBuffer, RawRxBuffer);
+			memcpy(ParsedRxBuffer, RawRxBuffer, sizeof(RawRxBuffer)+1);
 			successful=0;
 		}
 
@@ -310,13 +300,19 @@ uint8_t parserx()
 }
 
 
-uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char)
+uint8_t tx_chars(char string[], int txString_size, bool printOrNot, int frequency_of_tx_char)
 {
 	uint8_t FTWrite_Check;
 
 	for (int i = 0; i < (txString_size-1); i++){
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
 		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
+		if (FTWrite_Check != FT_OK)
+		{
+			setTextRed();
+			printf("Bad write!\n");
+			clearConsole();
+		}
 		Sleep(frequency_of_tx_char);
 		fprintf(debug, "%c", string[i]);	
 		while((txString_size) < *ptr_bytes_written){Sleep(1000);}
@@ -328,6 +324,34 @@ uint8_t txString(uint8_t string[], int txString_size, bool printOrNot, int frequ
 		}
 	}	
 	clearConsole();
+	return 0;
+}
+
+uint8_t tx_data(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char)
+{
+	uint8_t FTWrite_Check;
+
+	for (int i = 0; i < (txString_size-1); i++){
+		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
+		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
+		if (FTWrite_Check != FT_OK)
+		{
+			setTextRed();
+			printf("Bad write!\n");
+			clearConsole();
+		}
+		Sleep(frequency_of_tx_char);
+		fprintf(debug, "%c", string[i]);	
+		while((txString_size) < *ptr_bytes_written){Sleep(1000);}
+		
+		if(printOrNot)
+		{
+			setTextRed();
+			printf("%C", string[i]);
+		}
+	}	
+	clearConsole();
+	return 0;
 }
 
 
@@ -384,6 +408,7 @@ int FTDI_State_Machine(int state, int FT_Attempts)
 			printf("Error in FTDI SM call.");
 			break;
 	}
+	return 0;
 }
 
 
@@ -399,7 +424,6 @@ void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int UUE_Encoded_String_Ind
 
 	UUEDataFile = open_file ("uueFile.uue", "w" );
 	
-	uint8_t UUELineCountCharacter;
 	int total_char_index = 0;
 	
 
@@ -412,7 +436,7 @@ void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int UUE_Encoded_String_Ind
 	else
 	{
 		// Loop for total characters.
-		for (int characterIndex = 0; characterIndex < UUE_Encoded_String_Index; characterIndex)
+		for (int characterIndex = 0; characterIndex < UUE_Encoded_String_Index; characterIndex+=0)
 		{					
 			// Loop for characters per line.			
 			for (int lineIndex = 0; lineIndex < 61; ++lineIndex)
@@ -438,7 +462,7 @@ void writeHexDataTofile(struct Data data_local)
 		exit(0);
 	}
 	else{
-		for (int char_count_index = 0; totalDataIndex < data_local.HEX_array_size; char_count_index)
+		for (int char_count_index = 0; totalDataIndex < data_local.HEX_array_size; char_count_index+=0)
 		{
 			for (int line_index = 0; line_index < 16; ++line_index)
 			{
@@ -455,7 +479,7 @@ void writeHexDataTofile(struct Data data_local)
 }
 
 //Open file for reading, function.
-static FILE *open_file ( char *file, char *mode )
+FILE *open_file ( char *file, char *mode )
 {
   FILE *fileOpen = fopen ( file, mode );
 
@@ -493,24 +517,6 @@ void clearSpecChar()
 	}
 }
 
-//Copied in from lpc21isp.c
-static uint8_t Ascii2Hex(uint8_t c)
-{
-	if (c >= '0' && c <= '9')
-	{
-		return (uint8_t)(c - '0');
-	}
-	if (c >= 'A' && c <= 'F')
-	{
-		return (uint8_t)(c - 'A' + 10);
-	}
-	if (c >= 'a' && c <= 'f')
-	{
-        return (uint8_t)(c - 'A' + 10);
-	}
-	//printf("\n !!! Bad Character: %02X in file at totalCharsRead=%d !!!\n\n", c, totalCharsRead);
-	return 0;  // this "return" will never be reached, but some compilers give a warning if it is not present
-} 
 
 void copy_string(uint8_t *target, uint8_t *source)
 {
@@ -523,7 +529,17 @@ void copy_string(uint8_t *target, uint8_t *source)
    *target = '\0';
 }
 
-int tx_size(uint8_t * string)
+int tx_size_unsigned(uint8_t * string)
+{
+	// Used to size data array's for 
+	int count_char_in_string = 0;
+	while(string[count_char_in_string] != '\n'){count_char_in_string++;}
+	count_char_in_string++;
+
+	return count_char_in_string;
+}
+
+int tx_size_signed(char * string)
 {
 	// Used to size data array's for 
 	int count_char_in_string = 0;
@@ -598,12 +614,14 @@ int sectors_needed(int hex_data_array_size)
 
 int prepare_sectors(int sectors)
 {
-	uint8_t sectors_needed_string[128];
+	char sectors_needed_string[128];
 	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P %i %i\n", sectors-1, sectors-1);
-	txString(sectors_needed_string, tx_size(sectors_needed_string), PRINT, 0);
-	txString("\n", sizeof("\n"), PRINT, 0);
+	tx_chars(sectors_needed_string, tx_size_signed(sectors_needed_string), PRINT, 0);
+	tx_chars("\n", sizeof("\n"), PRINT, 0);
 	Sleep(300);
-	rx(PARSE, PRINT);		
+	rx(PARSE, PRINT);	
+
+	return 0;	
 }
 
 struct write validity_checksum(struct write write_local, struct Data data_local)
@@ -641,8 +659,9 @@ struct write validity_checksum(struct write write_local, struct Data data_local)
 		validity_sum += word;
 	}
 
-	printf("Validity sum: %lu\n", validity_sum);
+	printf("Validity sum: %"PRId32"\n", validity_sum);
 	
+	return write_local;
 }
 
 // Write to RAM.
@@ -658,12 +677,11 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	// 9. Return true if successful (combine step 9?)
 	
 	// Locals for creating intent_to_write string.
-	uint8_t address_as_string[9];
+	char address_as_string[9];
 	long int dec_ram_address = 0;
-	uint8_t dec_address_as_string[32];
-	uint8_t intent_to_write_string[512];
-	uint8_t intent_to_write_to_ram_string[512];
-	uint8_t checksum_as_string[64];
+	char dec_address_as_string[32];
+	char intent_to_write_to_ram_string[512];
+	char checksum_as_string[64];
 	
 	// Used to determine if write operation succeeded.
 	int successful = 0;
@@ -693,20 +711,20 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	// Loops until succeeded.
 	while(successful < 3){
 		// 3. Send intent-to-write string.
-		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), PRINT, 0);
-		txString("\n", sizeof("\n"), NO_PRINT, 0);
+		tx_chars(intent_to_write_to_ram_string, tx_size_signed(intent_to_write_to_ram_string), PRINT, 0);
+		tx_chars("\n", sizeof("\n"), NO_PRINT, 0);
 		Sleep(100);
 		rx(PARSE, PRINT);
 
 		// 4. Send chunk_A of data: "DATA\n"
-		txString(write_local.UUE_chunk_A, write_local.UUE_chunk_A_UUE_char_count, PRINT, slow_down);
+		tx_data(write_local.UUE_chunk_A, write_local.UUE_chunk_A_UUE_char_count, PRINT, slow_down);
 		Sleep(300);	
-		txString("\n", sizeof("\n"), NO_PRINT, 0);
+		tx_chars("\n", sizeof("\n"), NO_PRINT, 0);
 
 		// 5. Send checksum: "Chk_sum\n"
 		snprintf(checksum_as_string, 10, "%i\n", write_local.UUE_chunk_A_check_sum);
-		txString(checksum_as_string, tx_size(checksum_as_string), PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
+		tx_chars(checksum_as_string, tx_size_signed(checksum_as_string), PRINT, 0);
+		tx_chars("\n", sizeof("\n"), PRINT, 0);
 		Sleep(140);
 	
 		// 6. Read response from LPC.
@@ -749,20 +767,20 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	// Loops until succeeded.
 	while(successful < 3){
 		// 3. Send intent-to-write string.
-		txString(intent_to_write_to_ram_string, tx_size(intent_to_write_to_ram_string), PRINT, 0);
-		txString("\n", sizeof("\n"), NO_PRINT, 0);
+		tx_chars(intent_to_write_to_ram_string, tx_size_signed(intent_to_write_to_ram_string), PRINT, 0);
+		tx_chars("\n", sizeof("\n"), NO_PRINT, 0);
 		Sleep(100);
 		rx(PARSE, PRINT);
 
 		// 4. Send chunk_A of data: "DATA\n"
-		txString(write_local.UUE_chunk_B, write_local.UUE_chunk_B_UUE_char_count, PRINT, slow_down);
+		tx_data(write_local.UUE_chunk_B, write_local.UUE_chunk_B_UUE_char_count, PRINT, slow_down);
 		Sleep(200);	
-		txString("\n", sizeof("\n"), PRINT, 0);
+		tx_chars("\n", sizeof("\n"), PRINT, 0);
 
 		// 5. Send checksum: "Chk_sum\n"
 		snprintf(checksum_as_string, 10, "%i\n", write_local.UUE_chunk_B_check_sum);
-		txString(checksum_as_string, tx_size(checksum_as_string), NO_PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
+		tx_chars(checksum_as_string, tx_size_signed(checksum_as_string), NO_PRINT, 0);
+		tx_chars("\n", sizeof("\n"), PRINT, 0);
 		Sleep(110);
 	
 		// 6. Read response from LPC.
@@ -883,29 +901,29 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 
 struct write erase_chip(struct write write_local)
 {
-		uint8_t sectors_needed_string[128];
+		char sectors_needed_string[128];
 		snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P 0 7\n");
-		txString(sectors_needed_string, tx_size(sectors_needed_string), PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
+		tx_chars(sectors_needed_string, tx_size_signed(sectors_needed_string), PRINT, 0);
+		tx_chars("\n", sizeof("\n"), PRINT, 0);
 		rx(PARSE, PRINT);
 		Sleep(300);
 		
 		rx(PARSE, PRINT);
-		txString("E 0 1 2 3 4 5 6 7", sizeof("E 0 1 2 3 4 5 6 7"), PRINT, 0);
-		txString("\n", sizeof("\n"), PRINT, 0);
+		tx_chars("E 0 1 2 3 4 5 6 7", sizeof("E 0 1 2 3 4 5 6 7"), PRINT, 0);
+		tx_chars("\n", sizeof("\n"), PRINT, 0);
 		Sleep(200);
 		rx(PARSE, PRINT);
 
+		return write_local;
 }
 
 struct write ram_to_flash(struct write write_local, struct Data data_local)
 {
 	// Locals for creating intent_to_write string.
-	uint8_t address_as_string[9];
+	char address_as_string[9];
 	long int dec_flash_address = 0;
-	uint8_t flash_address_as_string[32];
-	uint8_t intent_to_write_string[512];
-	uint8_t intent_to_write_to_flash_string[512];
+	char flash_address_as_string[32];
+	char intent_to_write_to_flash_string[512];
 
 	// Used to determine sector ( 32 * 128 = 4096)
 	static int page_index;
@@ -944,9 +962,8 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
 	snprintf(intent_to_write_to_flash_string, sizeof(intent_to_write_to_flash_string), "C %s 268435836 %i\n", flash_address_as_string, 256);
 
-	txString(intent_to_write_to_flash_string, tx_size(intent_to_write_to_flash_string), PRINT, 0);
-	
-	txString("\n", sizeof("\n"), PRINT, 0);
+	tx_chars(intent_to_write_to_flash_string, tx_size_signed(intent_to_write_to_flash_string), PRINT, 0);
+	tx_chars("\n", sizeof("\n"), PRINT, 0);
 	Sleep(300);
 	rx(PARSE, PRINT);
 
@@ -961,7 +978,7 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 }
 
 
-void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string)
+void convert_32_hex_address_to_string(uint32_t address, char * address_as_string)
 {
 	// 1. Divide 32 bit int into nybbles.
 	// 2. Convert nybble into character.

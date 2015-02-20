@@ -17,10 +17,10 @@
 #include "main.h"
 
 // LPC handling
-uint8_t set_ISP_mode(int print);
-uint8_t get_LPC_Info(bool print);
+void get_LPC_Info(bool print);
 void command_response();
-uint8_t set_RUN_mode(int print);
+int set_ISP_mode(int print);
+int set_RUN_mode(int print);
 void wake_devices();
 void check_HM_10();
 

@@ -90,10 +90,10 @@ struct write
 	int bytes_written;
 
 	// ISP uses RAM from 0x1000 017C to 0x1000 17F
-	uint32_t ram_address;
+	int32_t ram_address;
 
 	// Flash address.
-	uint32_t Flash_address;
+	int32_t Flash_address;
 	int sectors_needed;
 	int sector_to_write;
 	int sector_index;
@@ -159,7 +159,7 @@ int FTDI_State_Machine(int state, int FT_Attempts);
 // Output files, for debugging purposes.
 void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int hexDataCharCount);
 void writeHexDataTofile(struct Data data_local);
-FILE *open_file ( char *file, char *mode );
+FILE *open_file ( uint8_t *file, uint8_t *mode );
 
 
 void OK();
@@ -179,7 +179,7 @@ int sectors_needed(int hex_data_array_size);
 struct write write_page_to_ram(struct write write_local, struct Data data_local);
 struct write prepare_page_to_write(struct write write_local, struct Data data_local);
 struct write ram_to_flash(struct write write_local, struct Data data_local);
-void convert_32_hex_address_to_string(uint32_t address, char * address_as_string);
+void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string);
 struct write erase_chip(struct write write_local);
 struct write validity_checksum(struct write write_local, struct Data data_local);
 

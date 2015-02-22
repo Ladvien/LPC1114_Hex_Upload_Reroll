@@ -30,4 +30,6 @@ void copy_string(uint8_t *target, uint8_t *source);
 int tx_size_unsigned(uint8_t * string);
 int tx_size_signed(char * string);
 
+void decode_three(char c0, char c1, char c2, char c3);
+
 #endif /* DEVICES */

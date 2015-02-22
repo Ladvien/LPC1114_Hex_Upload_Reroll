@@ -13,8 +13,8 @@ DWORD TxBytes;
 DWORD BytesWritten;
 DWORD RxBytes;
 DWORD BytesReceived;
-char RawRxBuffer[2048];
-char ParsedRxBuffer[2048];
+uint8_t RawRxBuffer[2048];
+uint8_t ParsedRxBuffer[2048];
 
 DWORD * ptr_bytes_written = &BytesWritten;
 
@@ -108,6 +108,9 @@ int main(int argc, char *argv[])
 	// using a 2d array.
 	//writeUUEDataTofile(data.UUE_array, data.UUE_array_size);
 	
+	// %`^H
+	decode_three('%','`','^','H');
+
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	wake_devices();
 
@@ -228,10 +231,10 @@ uint8_t parserx()
 		int successful = 0;
 		
 		// Does the RawRxBuffer contain an CR LF string?
-		char *CR_LF_CHK = strstr(RawRxBuffer, "\r\n");
-		char *OK_RES_LPC = strstr(RawRxBuffer, "OK");
+		uint8_t *CR_LF_CHK = strstr(RawRxBuffer, "\r\n");
+		uint8_t *OK_RES_LPC = strstr(RawRxBuffer, "OK");
 
-		char command_response_bfr[2];
+		uint8_t command_response_bfr[2];
 
 		// Clear ParsedRxBuffer.
 		for (int i = 0; i != sizeof(ParsedRxBuffer); ++i)
@@ -479,7 +482,7 @@ void writeHexDataTofile(struct Data data_local)
 }
 
 //Open file for reading, function.
-FILE *open_file ( char *file, char *mode )
+FILE *open_file ( uint8_t *file, uint8_t *mode )
 {
   FILE *fileOpen = fopen ( file, mode );
 
@@ -614,7 +617,7 @@ int sectors_needed(int hex_data_array_size)
 
 int prepare_sectors(int sectors)
 {
-	char sectors_needed_string[128];
+	uint8_t sectors_needed_string[128];
 	snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P %i %i\n", sectors-1, sectors-1);
 	tx_chars(sectors_needed_string, tx_size_signed(sectors_needed_string), PRINT, 0);
 	tx_chars("\n", sizeof("\n"), PRINT, 0);
@@ -677,11 +680,11 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	// 9. Return true if successful (combine step 9?)
 	
 	// Locals for creating intent_to_write string.
-	char address_as_string[9];
-	long int dec_ram_address = 0;
-	char dec_address_as_string[32];
-	char intent_to_write_to_ram_string[512];
-	char checksum_as_string[64];
+	uint8_t address_as_string[9];
+	uint32_t dec_ram_address = 0;
+	uint8_t dec_address_as_string[32];
+	uint8_t intent_to_write_to_ram_string[512];
+	uint8_t checksum_as_string[64];
 	
 	// Used to determine if write operation succeeded.
 	int successful = 0;
@@ -705,8 +708,9 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	dec_ram_address = strtol(address_as_string, NULL, 16);
 	snprintf(dec_address_as_string, sizeof(dec_address_as_string), "%d", dec_ram_address);
 
-	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
-	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, 128);
+	// 2. Create intent-to-write-to-ram string: "W 268435836 512\n"
+	//snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, 128);
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W 268435836 %i\n", 128);
 
 	// Loops until succeeded.
 	while(successful < 3){
@@ -762,7 +766,8 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	snprintf(dec_address_as_string, sizeof(dec_address_as_string), "%d", dec_ram_address);
 
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
-	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, 128);
+	//snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, 128);
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W 268435964 %i\n", 128);
 
 	// Loops until succeeded.
 	while(successful < 3){
@@ -901,7 +906,7 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 
 struct write erase_chip(struct write write_local)
 {
-		char sectors_needed_string[128];
+		uint8_t sectors_needed_string[128];
 		snprintf(sectors_needed_string, sizeof(sectors_needed_string), "P 0 7\n");
 		tx_chars(sectors_needed_string, tx_size_signed(sectors_needed_string), PRINT, 0);
 		tx_chars("\n", sizeof("\n"), PRINT, 0);
@@ -920,10 +925,10 @@ struct write erase_chip(struct write write_local)
 struct write ram_to_flash(struct write write_local, struct Data data_local)
 {
 	// Locals for creating intent_to_write string.
-	char address_as_string[9];
-	long int dec_flash_address = 0;
-	char flash_address_as_string[32];
-	char intent_to_write_to_flash_string[512];
+	uint8_t address_as_string[9];
+	uint32_t dec_flash_address = 0;
+	uint8_t flash_address_as_string[32];
+	uint8_t intent_to_write_to_flash_string[512];
 
 	// Used to determine sector ( 32 * 128 = 4096)
 	static int page_index;
@@ -978,13 +983,13 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 }
 
 
-void convert_32_hex_address_to_string(uint32_t address, char * address_as_string)
+void convert_32_hex_address_to_string(uint32_t address, uint8_t * address_as_string)
 {
 	// 1. Divide 32 bit int into nybbles.
 	// 2. Convert nybble into character.
 	// 3. Place characters into string.
 	int char_index = 0;
-	char buf_nybble;
+	uint8_t buf_nybble;
 	uint32_t buf_address = address;
 
 	// Loop through all 8 nybbles.

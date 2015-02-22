@@ -25,6 +25,31 @@ extern int totalCharsRead;
 //Reading characters from a file.
 extern uint8_t charToPut;
 
+void decode_three(char c0, char c1, char c2, char c3)
+{
+	uint8_t b0 = (uint8_t)c0;
+	uint8_t b1 = (uint8_t)c1;
+	uint8_t b2 = (uint8_t)c2;
+	uint8_t b3 = (uint8_t)c3;
+
+	if(b0 > 0x20 && b1 > 0x20 && b2 > 0x20 && b3 > 0x20 &&
+		b0 < 0x61 && b1 < 0x61 && b2 < 0x61 && b3 < 0x61)
+	{
+		uint32_t word;
+		word = (b0 - 0x20 & 0x3f) << 18;
+		word |= (b1 - 0x20 & 0x3f) << 12;
+		word |= (b2 - 0x20 & 0x3f) << 6;
+		word |= (b3 - 0x20 & 0x3f);
+
+		uint8_t ret[3];
+		ret[0] = (uint8_t)((word >> 16) & 0xff);
+		ret[1] = (uint8_t)((word >> 8) & 0xff);
+		ret[2] = (uint8_t)((word) & 0xff);
+		printf("%02X %02X %02X\n", ret[0], ret[1], ret[2]);
+	}
+
+}
+
 // Data Handling
 struct Data hex_file_to_array(struct Data data_local, int file_size)
 {

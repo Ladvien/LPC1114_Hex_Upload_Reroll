@@ -15,7 +15,6 @@ extern uint8_t RawRxBuffer[2048];
 extern uint8_t ParsedRxBuffer[2048];
 
 //File to be loaded.	
-extern FILE *fileIn;
 extern FILE *hexDataFile;
 extern FILE *UUEDataFile;
 extern FILE *debug;
@@ -25,7 +24,18 @@ extern int totalCharsRead;
 //Reading characters from a file.
 extern uint8_t charToPut;
 
-void decode_three(char c0, char c1, char c2, char c3)
+int file_sizer(FILE *file_to_size)
+{
+	int fileSize = 0;
+	while((fgetc (file_to_size)) != EOF)
+	{
+		fileSize++;
+	}
+	rewind(file_to_size);
+	return fileSize;
+}
+
+void decode_three(uint8_t * ret, char c0, char c1, char c2, char c3)
 {
 	uint8_t b0 = (uint8_t)c0;
 	uint8_t b1 = (uint8_t)c1;
@@ -41,19 +51,17 @@ void decode_three(char c0, char c1, char c2, char c3)
 		word |= (b2 - 0x20 & 0x3f) << 6;
 		word |= (b3 - 0x20 & 0x3f);
 
-		uint8_t ret[3];
-		ret[0] = (uint8_t)((word >> 16) & 0xff);
-		ret[1] = (uint8_t)((word >> 8) & 0xff);
-		ret[2] = (uint8_t)((word) & 0xff);
-		printf("%02X %02X %02X\n", ret[0], ret[1], ret[2]);
-	}
+    ret[0] = (uint8_t)((word >> 16) & 0xff);
+	ret[1] = (uint8_t)((word >> 8) & 0xff);
+	ret[2] = (uint8_t)((word) & 0xff);
+
+ 	printf("%02X %02X %02X\n", ret[0], ret[1], ret[2]);     }
 
 }
 
 // Data Handling
-struct Data hex_file_to_array(struct Data data_local, int file_size)
+int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 {
-	
 	//To hold file hex values.
 	uint8_t fhex_byte_count[MAX_SIZE_16];
 	uint8_t fhex_address1[MAX_SIZE_16];
@@ -66,6 +74,7 @@ struct Data hex_file_to_array(struct Data data_local, int file_size)
 	int file_char_index = 0;
 	int hex_data_index = 0;
 	int hex_line_index = 0;
+	int hex_data_count = 0;
 	
 	//Holds line count.	
 	int chars_this_line = 0;
@@ -74,16 +83,16 @@ struct Data hex_file_to_array(struct Data data_local, int file_size)
 	while(totalCharsRead  < file_size){
 		
 		//BYTE COUNT
-		fhex_byte_count[file_char_index] = readByte();
+		fhex_byte_count[file_char_index] = read_byte_from_file(file);
 		
 		//ADDRESS1 //Will create an 8 bit shift. --Bdk6's
-		fhex_address1[file_char_index] = readByte();
+		fhex_address1[file_char_index] = read_byte_from_file(file);
 		
 		//ADDRESS2
-		fhex_address2[file_char_index] = readByte();
+		fhex_address2[file_char_index] = read_byte_from_file(file);
 		
 		//RECORD TYPE
-		fhex_record_type[file_char_index] = readByte();	
+		fhex_record_type[file_char_index] = read_byte_from_file(file);	
 
 		if (fhex_record_type[file_char_index] == 0)
 		{
@@ -103,10 +112,10 @@ struct Data hex_file_to_array(struct Data data_local, int file_size)
 			while (hex_data_index < chars_this_line && totalCharsRead < file_size && chars_this_line != 0x00)
 			{
 				//Store the completed hex value in the char array.
-				data_local.HEX_array[data_local.HEX_array_size] = readByte();
+				hex_data[hex_data_count] = read_byte_from_file(file);
 				
 				//Index for data.
-				data_local.HEX_array_size++;	
+				hex_data_count++;	
 				hex_data_index++;			
 			}
 
@@ -116,21 +125,25 @@ struct Data hex_file_to_array(struct Data data_local, int file_size)
 		
 		//////// CHECK SUM //////////////
 		if (charToPut != 0xFF){
-			fhex_check_sum[file_char_index] = readByte();
+			fhex_check_sum[file_char_index] = read_byte_from_file(file);
 		}
 
 		hex_line_index++;
 		file_char_index++;
 	}
+	return hex_data_count;
 
+} // End hex_file_to_array
+
+int make_array_multiple_of_four(uint8_t * hex_data, int hex_array_size)
+{
 	// Assure # of bytes are divisble by 4.
-	while(!(data_local.HEX_array_size % 4 == 0))
+	while(!(hex_array_size % 4 == 0))
 	{
-		data_local.HEX_array[data_local.HEX_array_size] = ' ';
-		data_local.HEX_array_size++;
-	}
-
-	return data_local;
+		hex_data[hex_array_size] = ' ';
+		hex_array_size++;
+	}	
+	return hex_array_size;
 }
 
 int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_array_size)
@@ -239,18 +252,6 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 	return UUE_encoded_string_index;
 }
 
-
-int fileSizer()
-{
-	int fileSize;
-	while((fgetc (fileIn)) != EOF)
-	{
-		fileSize++;
-	}
-	rewind(fileIn);
-	return fileSize;
-}
-
 int check_sum(uint8_t * hex_data_array, int hex_data_array_size)
 {
 	int check_sum = 0;
@@ -264,20 +265,21 @@ int check_sum(uint8_t * hex_data_array, int hex_data_array_size)
 	return check_sum;
 }
 
-uint8_t readByte(){
+uint8_t read_byte_from_file(FILE * file)
+{
 	//Holds combined nibbles.
 	char ASCII_hexvalue[3];
 	char hex_hexvalue;
 	char * pEnd;
 
 	//Put first nibble in.
-	charToPut = fgetc (fileIn);
-	clearSpecChar();
+	charToPut = fgetc (file);
+	clear_special_char(file);
 	ASCII_hexvalue[0] = (uint8_t)charToPut;
 	
 	//Put second nibble in.
-	charToPut = fgetc (fileIn);
-	clearSpecChar();
+	charToPut = fgetc (file);
+	clear_special_char(file);
 	ASCII_hexvalue[1] = (uint8_t)charToPut;
 
 	// Increase counter for total characters read from file.
@@ -287,6 +289,15 @@ uint8_t readByte(){
 	hex_hexvalue = strtol(ASCII_hexvalue, &pEnd, 16);
 	
 	return hex_hexvalue;	
+}
+
+void clear_special_char(FILE * file)
+{
+	//Removes CR, LF, ':'  --Bdk6's
+	while (charToPut == '\n' || charToPut == '\r' || charToPut ==':'){
+		(charToPut = fgetc (file));
+		totalCharsRead++;
+	}
 }
 
 //Copied in from lpc21isp.c

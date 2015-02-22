@@ -19,7 +19,7 @@ uint8_t ParsedRxBuffer[2048];
 DWORD * ptr_bytes_written = &BytesWritten;
 
 //File to be loaded.	
-FILE *fileIn;
+
 FILE *hexDataFile;
 FILE *UUEDataFile;
 FILE *debug;
@@ -46,9 +46,12 @@ int main(int argc, char *argv[])
 	//For setting state of DTR/CTS.
 	//uint8_t DTR_Switch;
 	//uint8_t CTS_Switch;
-
+	FILE *hex_file;
 	// Holds the raw hex data, straight from the file.
 	uint8_t UUE_data_array[MAX_SIZE];
+
+	// Array for decoded chunk.
+	uint8_t decoded_bytes[3];
 
 	// Stores file size.
 	int fileSize = 0;
@@ -72,7 +75,7 @@ int main(int argc, char *argv[])
 	}
 
 	//Open file using command-line info; for reading.
-	fileIn = open_file (argv[1], "rb" );
+	hex_file = open_file (argv[1], "rb" );
 	
 	// Open FTDI.
 	FTDI_State_Machine(FTDI_SM_OPEN, FT_ATTEMPTS);
@@ -86,11 +89,14 @@ int main(int argc, char *argv[])
 	FT_SetBaudRate(handle, 115200);  //* Actually 9600 * 16
 
 	// Sizes file to be used in data handling.
-	fileSize = fileSizer();
+	fileSize = file_sizer(hex_file);
 
 	// Load the data from file
-	data = hex_file_to_array(data, fileSize);
-	
+	data.HEX_array_size = hex_file_to_array(hex_file, data.HEX_array, fileSize);
+	printf("YAAAAAAAHOOOOOOO %i\n", data.HEX_array_size);
+	data.HEX_array_size = make_array_multiple_of_four(data.HEX_array, data.HEX_array_size);
+	printf("YAAAAAAAHOOOOOOO %i\n", data.HEX_array_size);
+
 	write.sectors_needed = sectors_needed(data.HEX_array_size);
 
 	// Start with last sector needed.
@@ -108,8 +114,10 @@ int main(int argc, char *argv[])
 	// using a 2d array.
 	//writeUUEDataTofile(data.UUE_array, data.UUE_array_size);
 	
+	
+
 	// %`^H
-	decode_three('%','`','^','H');
+	decode_three(decoded_bytes, '%','`','^','H');
 
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	wake_devices();
@@ -166,7 +174,7 @@ int main(int argc, char *argv[])
 	*/
 
 	//Close files.
-	fclose ( fileIn );
+	fclose ( hex_file );
 	fclose ( UUEDataFile );
 	fclose ( hexDataFile );
 	fclose ( debug );
@@ -506,18 +514,6 @@ void Failed()
 	setTextRed();
 	printf("FAILED.\n\n");
 	clearConsole();	
-}
-
-
-
-
-void clearSpecChar()
-{
-	//Removes CR, LF, ':'  --Bdk6's
-	while (charToPut == '\n' || charToPut == '\r' || charToPut ==':'){
-		(charToPut = fgetc (fileIn));
-		totalCharsRead++;
-	}
 }
 
 

@@ -37,11 +37,13 @@ int command_response_code = 0;
 
 int main(int argc, char *argv[])
 {
+	// Setup console.
+	clearConsole();
+	startScreen();	
+
 	char file_name[40];
 	strncpy(file_name, argv[1], 39);
 	file_name[39] = '\n';
-
-	printf("%s\n", file_name);
 
 	//If the user fails to give us two arguments yell at him.	
 	if ( argc != 2 ) {
@@ -50,27 +52,35 @@ int main(int argc, char *argv[])
 	}
 
 	
-	char char_choice[2];
+	char char_choice[3];
 	int int_choice = 0;
-
 
 	do
 	{
 		printf("Menu: \n\n");
-		printf("1. Program Chip\n");
-		printf("2. Exit\n");
+		printf("1. FTDI Menu\n");
+		printf("2. Open HM-1X Menu\n");
+		printf("3. Connect LPC\n");
+		printf("4. Erase LPC\n");
+		printf("5. Program Chip\n");
+		printf("6. Decode UUE debug file\n");
+		printf("7. \n");
+		printf("8. \n");
+		printf("9. Exit\n");
 
-		scanf("%c", char_choice);
-
-		// Get first char (dropping \n from scanf)
+		scanf("%s", char_choice);
 		int_choice = atoi(char_choice);
 
+		printf("%i\n", int_choice);
 		switch (int_choice)
 		{
-			case 1:
+			case 5:
 				program_chip(file_name);
 			    break;
-			case 2:
+			case 5:
+				program_chip(file_name);
+			    break;
+			case 9:
 				shut_down();    
 			    break;
 			default:printf("wrong choice.Enter Again");
@@ -94,11 +104,6 @@ void shut_down()
 void program_chip(char file_name[])
 {
 	timer();
-
-	printf("BLAH1 %s \n", file_name);
-	// Setup console.
-	clearConsole();
-	startScreen();	
 
 	//For setting state of DTR/CTS.
 	//uint8_t DTR_Switch;
@@ -124,10 +129,10 @@ void program_chip(char file_name[])
 
 	// Local for FTDI State Machine.
 	//FTDI_state FTDI_Operation = RX_CLOSE;
-	printf("HERE!!!! %s\n", file_name);
+
 	//Open file using command-line info; for reading.
 	hex_file = open_file (file_name, "rb" );
-	printf("BLAH2 \n");
+
 	// Open FTDI.
 	FTDI_State_Machine(FTDI_SM_OPEN, FT_ATTEMPTS);
 
@@ -641,13 +646,12 @@ void startScreen()
 	printf("\n");
 	printf("\n");
 	printf("**************************************************************************\n");
-	printf("**** Mutant LPC1114 Downloader v.96                                  *****\n");
-	printf("**** Hacked Out with Little Thought                                  *****\n");
-	printf("****                                   Thanks to Bdk6                *****\n");
-	printf("****                            His help was more than invaluable,   *****\n");
-	printf("****                                 it was a necessity.             *****\n");
+	printf("**** Vorpal Hoff v.133                                               *****\n");
+	printf("**** In memory of Hoff70                                             *****\n");
+	printf("**** ALABTU!                                                         *****\n");
+	printf("****                                           Thanks to Bdk6        *****\n");
+	printf("****                                       His help was a necessity. *****\n");
 	printf("**************************************************************************\n");
-	printf("\n");
 	printf("\n");
 	clearConsole();
 }

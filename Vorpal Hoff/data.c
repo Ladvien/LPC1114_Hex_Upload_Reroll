@@ -1,28 +1,9 @@
 #include "data.h"
 
-
-extern uint8_t ParsedRxBuffer[2048];
-extern uint8_t RawRxBuffer[2048];
-extern int command_response_code;
-extern FT_HANDLE handle;
-extern FT_STATUS FT_status;
-extern DWORD EventDWord;
-extern DWORD TxBytes;
-extern DWORD BytesWritten;
-extern DWORD RxBytes;
-extern DWORD BytesReceived;
-extern uint8_t RawRxBuffer[2048];
-extern uint8_t ParsedRxBuffer[2048];
-
-//File to be loaded.	
-extern FILE *hexDataFile;
-extern FILE *UUEDataFile;
-extern FILE *debug;
-
-//Total bytesRead.
-extern int totalCharsRead;
-//Reading characters from a file.
-extern uint8_t charToPut;
+/*------------------------------------------------- DATA.c ------------
+|  Copyright (c) 2015 C. Thomas Brittain
+|							aka, Ladvien
+*-------------------------------------------------------------------*/
 
 int file_sizer(FILE *file_to_size)
 {
@@ -56,12 +37,16 @@ void decode_three(uint8_t * ret, char c0, char c1, char c2, char c3)
 	ret[2] = (uint8_t)((word) & 0xff);
 
  	printf("%02X %02X %02X\n", ret[0], ret[1], ret[2]);     }
-
 }
 
 // Data Handling
 int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 {
+	//Total bytesRead.
+	int totalCharsRead;
+	//Reading characters from a file.
+	uint8_t charToPut;
+
 	//To hold file hex values.
 	uint8_t fhex_byte_count[MAX_SIZE_16];
 	uint8_t fhex_address1[MAX_SIZE_16];
@@ -83,16 +68,16 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 	while(totalCharsRead  < file_size){
 		
 		//BYTE COUNT
-		fhex_byte_count[file_char_index] = read_byte_from_file(file);
+		fhex_byte_count[file_char_index] = read_byte_from_file(file, &charToPut, &totalCharsRead);
 		
 		//ADDRESS1 //Will create an 8 bit shift. --Bdk6's
-		fhex_address1[file_char_index] = read_byte_from_file(file);
+		fhex_address1[file_char_index] = read_byte_from_file(file, &charToPut, &totalCharsRead);
 		
 		//ADDRESS2
-		fhex_address2[file_char_index] = read_byte_from_file(file);
+		fhex_address2[file_char_index] = read_byte_from_file(file, &charToPut, &totalCharsRead);
 		
 		//RECORD TYPE
-		fhex_record_type[file_char_index] = read_byte_from_file(file);	
+		fhex_record_type[file_char_index] = read_byte_from_file(file, &charToPut, &totalCharsRead);	
 
 		if (fhex_record_type[file_char_index] == 0)
 		{
@@ -112,7 +97,7 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 			while (hex_data_index < chars_this_line && totalCharsRead < file_size && chars_this_line != 0x00)
 			{
 				//Store the completed hex value in the char array.
-				hex_data[hex_data_count] = read_byte_from_file(file);
+				hex_data[hex_data_count] = read_byte_from_file(file, &charToPut, &totalCharsRead);
 				
 				//Index for data.
 				hex_data_count++;	
@@ -125,7 +110,7 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 		
 		//////// CHECK SUM //////////////
 		if (charToPut != 0xFF){
-			fhex_check_sum[file_char_index] = read_byte_from_file(file);
+			fhex_check_sum[file_char_index] = read_byte_from_file(file, &charToPut, &totalCharsRead);
 		}
 
 		hex_line_index++;
@@ -134,6 +119,60 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 	return hex_data_count;
 
 } // End hex_file_to_array
+
+uint8_t read_byte_from_file(FILE * file, uint8_t * charToPut, int * totalCharsRead)
+{
+	//Holds combined nibbles.
+	char ASCII_hexvalue[3];
+	char hex_hexvalue;
+	char * pEnd;
+
+	//Put first nibble in.
+	*charToPut = fgetc (file);
+	clear_special_char(file, charToPut, totalCharsRead);
+	ASCII_hexvalue[0] = (uint8_t)*charToPut;
+	
+	//Put second nibble in.
+	*charToPut = fgetc (file);
+	clear_special_char(file, charToPut, totalCharsRead);
+	ASCII_hexvalue[1] = (uint8_t)*charToPut;
+
+	// Increase counter for total characters read from file.
+	*totalCharsRead+=2;
+
+	// Convert the hex string to base 16.
+	hex_hexvalue = strtol(ASCII_hexvalue, &pEnd, 16);
+	
+	return hex_hexvalue;	
+}
+
+void clear_special_char(FILE * file, uint8_t * charToPut, int * totalCharsRead)
+{
+	//Removes CR, LF, ':'  --Bdk6's
+	while (*charToPut == '\n' || *charToPut == '\r' || *charToPut ==':'){
+		(*charToPut = fgetc (file));
+		*totalCharsRead++;
+	}
+}
+
+//Copied in from lpc21isp.c
+uint8_t Ascii2Hex(uint8_t c)
+{
+	if (c >= '0' && c <= '9')
+	{
+		return (uint8_t)(c - '0');
+	}
+	if (c >= 'A' && c <= 'F')
+	{
+		return (uint8_t)(c - 'A' + 10);
+	}
+	if (c >= 'a' && c <= 'f')
+	{
+        return (uint8_t)(c - 'A' + 10);
+	}
+	//printf("\n !!! Bad Character: %02X in file at totalCharsRead=%d !!!\n\n", c, totalCharsRead);
+	return 0;  // this "return" will never be reached, but some compilers give a warning if it is not present
+}
 
 int make_array_multiple_of_four(uint8_t * hex_data, int hex_array_size)
 {
@@ -265,56 +304,3 @@ int check_sum(uint8_t * hex_data_array, int hex_data_array_size)
 	return check_sum;
 }
 
-uint8_t read_byte_from_file(FILE * file)
-{
-	//Holds combined nibbles.
-	char ASCII_hexvalue[3];
-	char hex_hexvalue;
-	char * pEnd;
-
-	//Put first nibble in.
-	charToPut = fgetc (file);
-	clear_special_char(file);
-	ASCII_hexvalue[0] = (uint8_t)charToPut;
-	
-	//Put second nibble in.
-	charToPut = fgetc (file);
-	clear_special_char(file);
-	ASCII_hexvalue[1] = (uint8_t)charToPut;
-
-	// Increase counter for total characters read from file.
-	totalCharsRead+=2;
-
-	// Convert the hex string to base 16.
-	hex_hexvalue = strtol(ASCII_hexvalue, &pEnd, 16);
-	
-	return hex_hexvalue;	
-}
-
-void clear_special_char(FILE * file)
-{
-	//Removes CR, LF, ':'  --Bdk6's
-	while (charToPut == '\n' || charToPut == '\r' || charToPut ==':'){
-		(charToPut = fgetc (file));
-		totalCharsRead++;
-	}
-}
-
-//Copied in from lpc21isp.c
-uint8_t Ascii2Hex(uint8_t c)
-{
-	if (c >= '0' && c <= '9')
-	{
-		return (uint8_t)(c - '0');
-	}
-	if (c >= 'A' && c <= 'F')
-	{
-		return (uint8_t)(c - 'A' + 10);
-	}
-	if (c >= 'a' && c <= 'f')
-	{
-        return (uint8_t)(c - 'A' + 10);
-	}
-	//printf("\n !!! Bad Character: %02X in file at totalCharsRead=%d !!!\n\n", c, totalCharsRead);
-	return 0;  // this "return" will never be reached, but some compilers give a warning if it is not present
-} 

@@ -1,26 +1,25 @@
 #ifndef DATA
 #define DATA
 
-/*------------------------------------------------- DATA.h ------------
+/*------------------------------------------------- DATA.h ----------
 |  Copyright (c) 2015 C. Thomas Brittain
 |							aka, Ladvien
 |
-|  Function 
+|  Module: data 
 |
-|  Purpose:  EXPLAIN WHAT THIS FUNCTION DOES TO SUPPORT THE CORRECT
-|      OPERATION OF THE PROGRAM, AND HOW IT DOES IT.
+|  Purpose: Common needed data handling funcitons to assist    
+| 			with peripheral interactions   
 |
-|  Parameters:
-|      parameter_name (IN, OUT, or IN/OUT) -- EXPLANATION OF THE
-|              PURPOSE OF THIS PARAMETER TO THE FUNCTION.
-|                      (REPEAT THIS FOR ALL FORMAL PARAMETERS OF
-|                       THIS FUNCTION.
-|                       IN = USED TO PASS DATA INTO THIS FUNCTION,
-|                       OUT = USED TO PASS DATA OUT OF THIS FUNCTION
-|                       IN/OUT = USED FOR BOTH PURPOSES.)
+|  Functions: FUNCTION: IN / OUT
+|      
+|              
+|                      
+|                       
+|                       
+|                       
+|                       
 |
-|  Returns:  IF THIS FUNCTION SENDS BACK A VALUE VIA THE RETURN
-|      MECHANISM, DESCRIBE THE PURPOSE OF THAT VALUE HERE.
+|  Returns:  
 *-------------------------------------------------------------------*/
 
 
@@ -39,7 +38,7 @@
 #define MAX_SIZE 32768
 #define MAX_SIZE_16 2048
 
-
+// Get char count in file.
 int file_sizer(FILE *file_to_size);
 
 // Data Handling
@@ -75,4 +74,4 @@ int tx_size_unsigned(uint8_t * string);
 // Get the size of a signed array.
 int tx_size_signed(char * string);
 
-#endif /* DEVICES */
+#endif /* DATA */

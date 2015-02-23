@@ -37,8 +37,65 @@ int command_response_code = 0;
 
 int main(int argc, char *argv[])
 {
+	char file_name[40];
+	strncpy(file_name, argv[1], 39);
+	file_name[39] = '\n';
+
+	printf("%s\n", file_name);
+
+	//If the user fails to give us two arguments yell at him.	
+	if ( argc != 2 ) {
+		fprintf ( stderr, "Usage: %s <readfile1>\n", argv[0] );
+		exit ( EXIT_FAILURE );
+	}
+
+	
+	char char_choice[2];
+	int int_choice = 0;
+
+
+	do
+	{
+		printf("Menu: \n\n");
+		printf("1. Program Chip\n");
+		printf("2. Exit\n");
+
+		scanf("%c", char_choice);
+
+		// Get first char (dropping \n from scanf)
+		int_choice = atoi(char_choice);
+
+		switch (int_choice)
+		{
+			case 1:
+				program_chip(file_name);
+			    break;
+			case 2:
+				shut_down();    
+			    break;
+			default:printf("wrong choice.Enter Again");
+			    break;
+		}
+
+	}while(int_choice !=3);
+	
+} // END PROGRAM
+
+void shut_down()
+{
+	fclose ( UUEDataFile );
+	fclose ( hexDataFile );
+	fclose ( debug );
+	clearConsole();
+	printf("\nGood-bye.\n");
+	exit(0);
+}
+
+void program_chip(char file_name[])
+{
 	timer();
 
+	printf("BLAH1 %s \n", file_name);
 	// Setup console.
 	clearConsole();
 	startScreen();	
@@ -67,16 +124,10 @@ int main(int argc, char *argv[])
 
 	// Local for FTDI State Machine.
 	//FTDI_state FTDI_Operation = RX_CLOSE;
-
-	//If the user fails to give us two arguments yell at him.	
-	if ( argc != 2 ) {
-		fprintf ( stderr, "Usage: %s <readfile1>\n", argv[0] );
-		exit ( EXIT_FAILURE );
-	}
-
+	printf("HERE!!!! %s\n", file_name);
 	//Open file using command-line info; for reading.
-	hex_file = open_file (argv[1], "rb" );
-	
+	hex_file = open_file (file_name, "rb" );
+	printf("BLAH2 \n");
 	// Open FTDI.
 	FTDI_State_Machine(FTDI_SM_OPEN, FT_ATTEMPTS);
 
@@ -179,7 +230,7 @@ int main(int argc, char *argv[])
 	fclose ( hexDataFile );
 	fclose ( debug );
 	clearConsole();
-} // END PROGRAM
+}
 
 ///////////// FTDI  //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

@@ -149,6 +149,10 @@ typedef enum {
 
 //////////////////// Forward Declaration ////////////////////////////////////////////////////////////
 
+void shut_down();
+
+void program_chip(char file_name[]);
+
 // FTDI
 uint8_t rx(bool parse, bool printOrNot);
 uint8_t parserx();

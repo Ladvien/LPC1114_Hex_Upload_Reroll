@@ -32,18 +32,19 @@ void decode_three(uint8_t * ret, char c0, char c1, char c2, char c3)
 		word |= (b2 - 0x20 & 0x3f) << 6;
 		word |= (b3 - 0x20 & 0x3f);
 
-    ret[0] = (uint8_t)((word >> 16) & 0xff);
-	ret[1] = (uint8_t)((word >> 8) & 0xff);
-	ret[2] = (uint8_t)((word) & 0xff);
+	    ret[0] = (uint8_t)((word >> 16) & 0xff);
+		ret[1] = (uint8_t)((word >> 8) & 0xff);
+		ret[2] = (uint8_t)((word) & 0xff);
 
- 	printf("%02X %02X %02X\n", ret[0], ret[1], ret[2]);     }
+	 	printf("%02X %02X %02X\n", ret[0], ret[1], ret[2]);     
+ 	}
 }
 
 // Data Handling
 int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 {
 	//Total bytesRead.
-	int totalCharsRead;
+	int totalCharsRead = 0;
 	//Reading characters from a file.
 	uint8_t charToPut;
 

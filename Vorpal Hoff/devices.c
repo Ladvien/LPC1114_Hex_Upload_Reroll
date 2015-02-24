@@ -1,9 +1,9 @@
 #include "devices.h"
-
+extern FT_DEVICE_LIST_INFO_NODE *devInfo;
 extern uint8_t ParsedRxBuffer[2048];
 extern uint8_t RawRxBuffer[2048];
 extern int command_response_code;
-extern FT_HANDLE handle;
+
 extern FT_STATUS FT_status;
 extern DWORD EventDWord;
 extern DWORD TxBytes;
@@ -34,10 +34,10 @@ void check_HM_10()
 	tx_chars("AT+RSSI?", sizeof("AT+RSSI?"), NO_PRINT, 0);
 	Sleep(500);
 
-	FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
+	FT_GetStatus(devInfo[connected_device_num].ftHandle, &RxBytes, &TxBytes, &EventDWord);
 
 	if (RxBytes > 0) {
-		FT_status = FT_Read(handle,RawRxBuffer,RxBytes,&BytesReceived);
+		FT_status = FT_Read(devInfo[connected_device_num].ftHandle,RawRxBuffer,RxBytes,&BytesReceived);
 	}
 	else
 	{

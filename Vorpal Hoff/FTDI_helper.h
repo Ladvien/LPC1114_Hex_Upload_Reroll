@@ -48,15 +48,16 @@ extern DWORD BytesWritten;
 extern DWORD RxBytes;
 extern DWORD BytesReceived;
 
+int connected_device_num;
+
 // Lists FTDI commands.
 void ftdi_menu();
 
 // Lists FTDI devices connected.
 bool get_device_list();
-bool connect_device(int connected_device_num);
+bool connect_device(long int * local_baud_rate);
 bool close_device();
-
-
-
+bool reset_device();
+bool set_baud_rate(long int * local_baud_rate);
 
 #endif /* FTDI_helper.h */

@@ -1,9 +1,11 @@
-#include "FTDI_helper.h"
-#include "main.h"
 /*------------------------------------------------- FTDI_helper.c ------------
 |  Copyright (c) 2015 C. Thomas Brittain
 |							aka, Ladvien
 *-------------------------------------------------------------------*/
+
+#include "FTDI_helper.h"
+#include "main.h"
+
 FT_STATUS ftStatus;
 DWORD numDevs;
 
@@ -11,27 +13,43 @@ extern FT_DEVICE_LIST_INFO_NODE *devInfo;
 
 void ftdi_menu()
 {
-
-
+	long int baud_rate = 0;	
 	char char_choice[3];
 	int int_choice = 0;
 
 	bool got_list = false;
 	bool connected_flag = false;
+	bool close_device_flag = false;
+	bool set_baud_flag = false;
 
-	int connected_device_num = 0;
-
+	// FTDI Menu
 	do
 	{
 		system("cls");
-		printf("FTDI Menu: \n\n");
-		printf("1. Device List\n");
-		if (got_list == true)
+		printf("FTDI Menu: ");
+		if (connected_flag == true)
 		{
-		printf("2. Connect Device\n");
+			printf("       Connected: %lu, N, 1     \n\n", baud_rate);
 		}
-		
-		printf("9. Return\n");
+		else
+		{
+			printf("       Not Connected:               \n\n");
+		}
+		printf("1. Device List\n");
+		if (got_list == true) // Only display option if devices list.
+		{
+		printf("2. Connect Device\n"); 
+		}
+		if (connected_flag == true) // Only give display if connected.
+		{
+		printf("3. Close Device\n");
+		}
+		if (connected_flag == true) // Only give display if connected.
+		{
+		printf("4. Change baud-rate\n");
+		}
+
+		printf("9. Main Menu\n");
 
 		if (got_list == true && connect_device == false)
 		{
@@ -62,19 +80,36 @@ void ftdi_menu()
 
 		}
 
+		// Get user choice.
 		scanf("%s", char_choice);
+
+		// Convert string to int for switch statement.
 		int_choice = atoi(char_choice);
 
-		printf("%i\n", int_choice);
 		switch (int_choice)
 		{
 			case 1:
 				got_list = get_device_list();
-				break; 
+				break;
 			case 2:
-				connected_flag = connect_device(connected_device_num);
+				if (got_list == true) // Only display option if devices listed.
+				{			
+					connected_flag = connect_device(&baud_rate);
+				} 
+				break;
+			case 3:
+				if (connected_flag == true) // Only give display if connected.
+				{
+					close_device_flag = close_device();
+					if(close_device_flag == true){connected_flag = false;}
+			    }
 			    break;
-			case 6:
+			case 4:
+				if (connected_flag == true) // Only give display if connected.
+				{
+					set_baud_flag = set_baud_rate(&baud_rate);
+					if(close_device_flag == true){connected_flag = false;}
+			    }
 			    break;
 			case 9:
 				main_menu();    
@@ -132,7 +167,7 @@ bool get_device_list()
 	return false;
 }
 
-bool connect_device(int connected_device_num)
+bool connect_device(long int * local_baud_rate)
 {
 
 	char char_choice[3];
@@ -167,7 +202,12 @@ bool connect_device(int connected_device_num)
 	else if (int_choice > -1 && int_choice < 9 && int_choice <= numDevs)
 	{
 		// Open user's selection.
-		FT_Open(int_choice, &handle);
+		FT_Open(int_choice, &devInfo[int_choice].ftHandle);
+
+		// Set default baud rate.
+		*local_baud_rate = 115200;
+		FT_SetBaudRate(devInfo[connected_device_num].ftHandle, *local_baud_rate);
+
 		if (FT_status != FT_OK)
 		{
 			printf("Could not open FTDI device #%i.\n", int_choice);
@@ -184,4 +224,100 @@ bool connect_device(int connected_device_num)
 		return false;
 	}
 	return false;
+}
+
+bool close_device()
+{
+	FT_Close(devInfo[connected_device_num].ftHandle);
+
+	if (FT_status != FT_OK)
+	{
+		printf("Could not close FTDI device. Attempt %i\n");
+		Sleep(100);
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+	return false;
+}
+
+bool reset_device()
+{
+	FT_ResetPort(devInfo[connected_device_num].ftHandle);
+
+	if (FT_status != FT_OK)
+	{
+		printf("Could not reset FTDI device.\n");
+		Sleep(3000);
+		return false;
+	}
+	else
+	{
+		// Device reset a success.
+		return true;
+	}				
+	return false; // Just in case.
+}
+
+bool set_baud_rate(long int * local_baud_rate)
+{
+
+	char char_choice[3];
+	int int_choice = 0;
+
+	system("cls");
+	printf("Set baud: \n");	
+	printf("1. 9600\n");
+	printf("2. 19200\n");
+	printf("3. 38400\n");
+	printf("4. 57600\n");
+	printf("5. 115200\n");
+	printf("6. 230400\n");
+	printf("9. Exit\n");
+
+	scanf("%s", char_choice);
+	int_choice = atoi(char_choice);
+	printf("%i\n", int_choice);
+
+	switch (int_choice)
+	{
+		case 1:
+			*local_baud_rate = 9600;
+			break;
+		case 2:
+			*local_baud_rate = 19200;
+			break;
+		case 3:
+			*local_baud_rate = 38400;
+			break;
+		case 4:
+			*local_baud_rate = 57600;
+			break;
+		case 5:
+			*local_baud_rate = 115200;
+			break;
+		case 6:
+			*local_baud_rate = 230400;
+			break;
+		case 9:
+			return false;
+			break;
+		default:printf("""Bad choice. Hot glue!""");
+		    break;
+	}
+
+	FT_SetBaudRate(devInfo[connected_device_num].ftHandle, *local_baud_rate);
+	if (FT_OK != FT_OK)
+	 {
+	 	printf("Unable to change baud-rate\n");
+	 	Sleep(3000);
+	 	return false;
+	 } 
+	 else
+	 {
+	 	return true;
+	 }
+	 return false;
 }

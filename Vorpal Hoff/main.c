@@ -6,7 +6,7 @@
 
 //Serial Port handle.
 //Used by FTD2XX
-FT_HANDLE handle = NULL;
+//FT_HANDLE handle = NULL;
 FT_STATUS FT_status;
 
 DWORD EventDWord;
@@ -75,8 +75,8 @@ void main_menu()
 		printf("4. Erase LPC\n");
 		printf("5. Program Chip\n");
 		printf("6. Decode UUE debug file\n");
-		printf("7. \n");
-		printf("8. \n");
+		//printf("7. \n");
+		//printf("8. \n");
 		printf("9. Exit\n");
 
 		scanf("%s", char_choice);
@@ -144,16 +144,8 @@ void program_chip(char file_name[])
 	//Open file using command-line info; for reading.
 	hex_file = open_file (file_name, "rb" );
 
-	// Open FTDI.
-	FTDI_State_Machine(FTDI_SM_OPEN, FT_ATTEMPTS);
-
 	// Strange, this has to happen to get a response from the device.
-	FTDI_State_Machine(FTDI_SM_RESET, FT_ATTEMPTS);	
-
-	//Set up pins we will use.
-	//FT_SetBitMode(handle, PIN_DTR | PIN_CTS, 1);
-	//Setup serial port, even though we are banging.
-	FT_SetBaudRate(handle, 115200);  //* Actually 9600 * 16
+	reset_device();
 
 	// Sizes file to be used in data handling.
 	fileSize = file_sizer(hex_file);
@@ -246,13 +238,13 @@ uint8_t rx(bool parse, bool printOrNot)
 	// 0 = unsuccessful, 1 = LPC, 2 = HM-10
 	int device_and_success = 0;
 	//FT_SetTimeouts(handle, timeout, 0);
-	FT_GetStatus(handle, &RxBytes, &TxBytes, &EventDWord);
+	FT_GetStatus(devInfo[connected_device_num].ftHandle, &RxBytes, &TxBytes, &EventDWord);
 
 	setTextGreen();
 
 	if (RxBytes > 0) {
 
-		FT_status = FT_Read(handle,RawRxBuffer,RxBytes,&BytesReceived);
+		FT_status = FT_Read(devInfo[connected_device_num].ftHandle,RawRxBuffer,RxBytes,&BytesReceived);
 		if (FT_status == FT_OK) {
 
 			if(parse)
@@ -374,7 +366,7 @@ uint8_t tx_chars(char string[], int txString_size, bool printOrNot, int frequenc
 
 	for (int i = 0; i < (txString_size-1); i++){
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
-		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
+		FTWrite_Check = FT_Write(devInfo[connected_device_num].ftHandle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
 		if (FTWrite_Check != FT_OK)
 		{
 			setTextRed();
@@ -401,7 +393,7 @@ uint8_t tx_data(uint8_t string[], int txString_size, bool printOrNot, int freque
 
 	for (int i = 0; i < (txString_size-1); i++){
 		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
-		FTWrite_Check = FT_Write(handle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
+		FTWrite_Check = FT_Write(devInfo[connected_device_num].ftHandle, &string[i], (DWORD)sizeof(string[i]), ptr_bytes_written);
 		if (FTWrite_Check != FT_OK)
 		{
 			setTextRed();
@@ -433,7 +425,7 @@ int FTDI_State_Machine(int state, int FT_Attempts)
 			for (int i = 0; i < FT_Attempts; ++i)
 			{
 				// FT command
-				FT_Open(0, &handle);
+				FT_Open(0, &devInfo[connected_device_num].ftHandle);
 				if (FT_status != FT_OK)
 				{
 					printf("Could not open FTDI device. Attempt %i\n", i);
@@ -447,7 +439,7 @@ int FTDI_State_Machine(int state, int FT_Attempts)
 		case FTDI_SM_RESET: 
 			for (int i = 0; i < FT_Attempts; ++i)
 			{
-				FT_ResetPort(handle);
+				FT_ResetPort(devInfo[connected_device_num].ftHandle);
 				if (FT_status != FT_OK)
 				{
 					printf("Could not reset FTDI device. Attempt %i\n", i);
@@ -461,7 +453,7 @@ int FTDI_State_Machine(int state, int FT_Attempts)
 		case FTDI_SM_CLOSE:
 			for (int i = 0; i < FT_Attempts; ++i)
 			{
-				FT_Close(handle);
+				FT_Close(devInfo[connected_device_num].ftHandle);
 				if (FT_status != FT_OK)
 				{
 					printf("Could not close FTDI device. Attempt %i\n", i);

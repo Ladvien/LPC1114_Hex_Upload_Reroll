@@ -17,6 +17,7 @@
 #include "devices.h"
 #include "data.h"
 #include <inttypes.h>
+#include "FTDI_helper.h"
 
 //////////////////// Variables and Defines ////////////////////////////////////////////////////////
 
@@ -149,9 +150,10 @@ typedef enum {
 
 //////////////////// Forward Declaration ////////////////////////////////////////////////////////////
 
+void main_menu();
 void shut_down();
 
-void program_chip(char file_name[]);
+void program_chip();
 
 // FTDI
 uint8_t rx(bool parse, bool printOrNot);

@@ -2,24 +2,30 @@
 //popular FTDI breakouts, like Sparkfun's, to be used as a serial programmer for 
 //the LPC1114.  Shooting for no manual reset.
 #include "main.h"
-
+#include "FTDI_helper.h"
 
 //Serial Port handle.
 //Used by FTD2XX
 FT_HANDLE handle = NULL;
 FT_STATUS FT_status;
+
 DWORD EventDWord;
 DWORD TxBytes;
 DWORD BytesWritten;
 DWORD RxBytes;
 DWORD BytesReceived;
+
+FT_DEVICE_LIST_INFO_NODE *devInfo;
+
+
 uint8_t RawRxBuffer[2048];
 uint8_t ParsedRxBuffer[2048];
 
 DWORD * ptr_bytes_written = &BytesWritten;
 
-//File to be loaded.	
+char file_name[40];
 
+//File to be loaded.	
 FILE *hexDataFile;
 FILE *UUEDataFile;
 FILE *debug;
@@ -39,25 +45,30 @@ int main(int argc, char *argv[])
 {
 	// Setup console.
 	clearConsole();
-	startScreen();	
 
-	char file_name[40];
+
 	strncpy(file_name, argv[1], 39);
 	file_name[39] = '\n';
 
+	main_menu();
 	//If the user fails to give us two arguments yell at him.	
 	if ( argc != 2 ) {
 		fprintf ( stderr, "Usage: %s <readfile1>\n", argv[0] );
 		exit ( EXIT_FAILURE );
 	}
+} // END PROGRAM
 
-	
+void main_menu()
+{
 	char char_choice[3];
 	int int_choice = 0;
 
 	do
 	{
-		printf("Menu: \n\n");
+		system("cls");
+		startScreen();
+		printf("\n");	
+		printf("Vorpal Hoff -- Main Menu: \n\n");
 		printf("1. FTDI Menu\n");
 		printf("2. Open HM-1X Menu\n");
 		printf("3. Connect LPC\n");
@@ -70,15 +81,17 @@ int main(int argc, char *argv[])
 
 		scanf("%s", char_choice);
 		int_choice = atoi(char_choice);
-
 		printf("%i\n", int_choice);
+
 		switch (int_choice)
 		{
+			case 1:
+				ftdi_menu();
+				break; 
 			case 5:
 				program_chip(file_name);
 			    break;
-			case 5:
-				program_chip(file_name);
+			case 6:
 			    break;
 			case 9:
 				shut_down();    
@@ -86,10 +99,9 @@ int main(int argc, char *argv[])
 			default:printf("wrong choice.Enter Again");
 			    break;
 		}
-
-	}while(int_choice !=3);
+	}while(int_choice !=99);
 	
-} // END PROGRAM
+}
 
 void shut_down()
 {
@@ -126,7 +138,6 @@ void program_chip(char file_name[])
 	// ISP uses RAM from 0x1000 017C to 0x1000 17F
 	write.ram_address = 0x1000017C;
 
-
 	// Local for FTDI State Machine.
 	//FTDI_state FTDI_Operation = RX_CLOSE;
 
@@ -149,10 +160,7 @@ void program_chip(char file_name[])
 
 	// Load the data from file
 	data.HEX_array_size = hex_file_to_array(hex_file, data.HEX_array, fileSize);
-	printf("YAAAAAAAHOOOOOOO %i\n", data.HEX_array_size);
 	data.HEX_array_size = make_array_multiple_of_four(data.HEX_array, data.HEX_array_size);
-	printf("YAAAAAAAHOOOOOOO %i\n", data.HEX_array_size);
-
 	write.sectors_needed = sectors_needed(data.HEX_array_size);
 
 	// Start with last sector needed.
@@ -164,13 +172,6 @@ void program_chip(char file_name[])
 
 	// Write hex string back to a file.  Used for debugging.
 	writeHexDataTofile(data);
-	
-	// Write the UUE string to a file.  CURRENTLY BROKEN-ish.
-	// UPDATE: I hope to re-write this when I begin writing to RAM
-	// using a 2d array.
-	//writeUUEDataTofile(data.UUE_array, data.UUE_array_size);
-	
-	
 
 	// %`^H
 	decode_three(decoded_bytes, '%','`','^','H');

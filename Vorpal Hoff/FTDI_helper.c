@@ -13,7 +13,7 @@ extern FT_DEVICE_LIST_INFO_NODE *devInfo;
 
 void ftdi_menu()
 {
-	long int baud_rate = 0;	
+	int baud_rate = 0;	
 	char char_choice[3];
 	int int_choice = 0;
 
@@ -35,18 +35,19 @@ void ftdi_menu()
 		{
 			printf("       Not Connected:               \n\n");
 		}
-		printf("1. Device List\n");
+		printf("1. Quick Connect\n");
+		printf("2. Device List\n");
 		if (got_list == true) // Only display option if devices list.
 		{
-		printf("2. Connect Device\n"); 
+		printf("3. Connect Device\n"); 
 		}
 		if (connected_flag == true) // Only give display if connected.
 		{
-		printf("3. Close Device\n");
+		printf("4. Close Device\n");
 		}
 		if (connected_flag == true) // Only give display if connected.
 		{
-		printf("4. Change baud-rate\n");
+		printf("5. Change baud-rate\n");
 		}
 
 		printf("9. Main Menu\n");
@@ -89,26 +90,32 @@ void ftdi_menu()
 		switch (int_choice)
 		{
 			case 1:
+				quick_connect();
+				baud_rate = 115200;
+				connected_flag = true;
+			case 2:
 				got_list = get_device_list();
 				break;
-			case 2:
+			case 3:
 				if (got_list == true) // Only display option if devices listed.
 				{			
 					connected_flag = connect_device(&baud_rate);
 				} 
 				break;
-			case 3:
+			case 4:
 				if (connected_flag == true) // Only give display if connected.
 				{
-					close_device_flag = close_device();
+					close_device_flag = close_device(&baud_rate);
 					if(close_device_flag == true){connected_flag = false;}
+					close_device_flag = false;
 			    }
 			    break;
-			case 4:
+			case 5:
 				if (connected_flag == true) // Only give display if connected.
 				{
 					set_baud_flag = set_baud_rate(&baud_rate);
 					if(close_device_flag == true){connected_flag = false;}
+					close_device_flag = false;
 			    }
 			    break;
 			case 9:
@@ -120,7 +127,22 @@ void ftdi_menu()
 	}while(int_choice !=99);
 }
 
-	
+void quick_connect()
+{
+
+	int local_baud_rate = 115200;
+	// Create the device information list
+	ftStatus = FT_CreateDeviceInfoList(&numDevs);
+	// get the device information list
+	ftStatus = FT_GetDeviceInfoList(devInfo,&numDevs);
+	// Open user's selection.
+	// Allocate storage for list based on numDevs.
+	devInfo =
+	(FT_DEVICE_LIST_INFO_NODE*)malloc(sizeof(FT_DEVICE_LIST_INFO_NODE)*numDevs);
+	FT_Open(0, &devInfo[0].ftHandle);
+	FT_SetBaudRate(devInfo[0].ftHandle, local_baud_rate);
+
+}
 	
 bool get_device_list()
 {
@@ -138,7 +160,6 @@ bool get_device_list()
 	ftStatus = FT_CreateDeviceInfoList(&numDevs);
 	if (ftStatus == FT_OK) {
 		printf("Number of devices is %d\n",numDevs);
-		Sleep(50);
 	}
 
 	if (numDevs > 0) {
@@ -151,7 +172,6 @@ bool get_device_list()
 		ftStatus = FT_GetDeviceInfoList(devInfo,&numDevs);
 		if (ftStatus == FT_OK) {
 				printf("Got Devices\n");
-				Sleep(50);
 			}
 		else
 			{
@@ -167,7 +187,7 @@ bool get_device_list()
 	return false;
 }
 
-bool connect_device(long int * local_baud_rate)
+bool connect_device(int * local_baud_rate)
 {
 
 	char char_choice[3];
@@ -206,6 +226,7 @@ bool connect_device(long int * local_baud_rate)
 
 		// Set default baud rate.
 		*local_baud_rate = 115200;
+
 		FT_SetBaudRate(devInfo[connected_device_num].ftHandle, *local_baud_rate);
 
 		if (FT_status != FT_OK)
@@ -226,14 +247,15 @@ bool connect_device(long int * local_baud_rate)
 	return false;
 }
 
-bool close_device()
+bool close_device(int * local_baud_rate)
 {
 	FT_Close(devInfo[connected_device_num].ftHandle);
+	*local_baud_rate = 0;
 
 	if (FT_status != FT_OK)
 	{
-		printf("Could not close FTDI device. Attempt %i\n");
-		Sleep(100);
+		printf("Could not close FTDI device.\n");
+		Sleep(3000);
 		return false;
 	}
 	else
@@ -243,10 +265,11 @@ bool close_device()
 	return false;
 }
 
-bool reset_device()
+bool reset_device(int * local_baud_rate)
 {
 	FT_ResetPort(devInfo[connected_device_num].ftHandle);
-
+	*local_baud_rate = 0;
+	
 	if (FT_status != FT_OK)
 	{
 		printf("Could not reset FTDI device.\n");
@@ -261,7 +284,7 @@ bool reset_device()
 	return false; // Just in case.
 }
 
-bool set_baud_rate(long int * local_baud_rate)
+bool set_baud_rate(int * local_baud_rate)
 {
 
 	char char_choice[3];
@@ -279,7 +302,6 @@ bool set_baud_rate(long int * local_baud_rate)
 
 	scanf("%s", char_choice);
 	int_choice = atoi(char_choice);
-	printf("%i\n", int_choice);
 
 	switch (int_choice)
 	{

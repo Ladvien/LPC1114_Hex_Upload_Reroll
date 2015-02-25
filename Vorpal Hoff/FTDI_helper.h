@@ -53,11 +53,13 @@ int connected_device_num;
 // Lists FTDI commands.
 void ftdi_menu();
 
+void quick_connect();
+
 // Lists FTDI devices connected.
 bool get_device_list();
-bool connect_device(long int * local_baud_rate);
-bool close_device();
-bool reset_device();
-bool set_baud_rate(long int * local_baud_rate);
+bool connect_device(int * local_baud_rate);
+bool close_device(int * local_baud_rate);
+bool reset_device(int * local_baud_rate);
+bool set_baud_rate(int * local_baud_rate);
 
 #endif /* FTDI_helper.h */

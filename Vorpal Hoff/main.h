@@ -18,6 +18,7 @@
 #include "data.h"
 #include <inttypes.h>
 #include "FTDI_helper.h"
+#include "HM_1X.h"
 
 //////////////////// Variables and Defines ////////////////////////////////////////////////////////
 
@@ -160,7 +161,7 @@ uint8_t rx(bool parse, bool printOrNot);
 uint8_t parserx();
 uint8_t tx_chars(char string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
 uint8_t tx_data(uint8_t string[], int txString_size, bool printOrNot, int frequency_of_tx_char);
-int FTDI_State_Machine(int state, int FT_Attempts);
+
 
 // Output files, for debugging purposes.
 void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int hexDataCharCount);

@@ -1,1 +1,1 @@
-gcc main.c -o main devices.c data.c FTDI_helper.c -L./ -lftd2xx -std=c99
+gcc main.c -o main devices.c data.c HM_1X.c FTDI_helper.c -L./ -lftd2xx -std=c99

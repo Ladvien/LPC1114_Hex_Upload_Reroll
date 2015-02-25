@@ -69,25 +69,34 @@ void main_menu()
 		startScreen();
 		printf("\n");	
 		printf("Vorpal Hoff -- Main Menu: \n\n");
-		printf("1. FTDI Menu\n");
-		printf("2. Open HM-1X Menu\n");
-		printf("3. Connect LPC\n");
-		printf("4. Erase LPC\n");
+		printf("1. Quick Connect\n");
+		printf("2. FTDI Menu\n");
+		printf("3. Open HM-1X Menu\n");
+		printf("4. Connect LPC\n");
 		printf("5. Program Chip\n");
-		printf("6. Decode UUE debug file\n");
+		printf("6. Erase LPC\n");
+		printf("7. Decode UUE debug file\n");
 		//printf("7. \n");
 		//printf("8. \n");
 		printf("9. Exit\n");
 
 		scanf("%s", char_choice);
 		int_choice = atoi(char_choice);
-		printf("%i\n", int_choice);
 
 		switch (int_choice)
 		{
 			case 1:
+				quick_connect();
+				break;
+			case 2:
 				ftdi_menu();
+				break;
+			case 3:
+				HM_1X_main_menu();
 				break; 
+			case 4:
+
+				break;
 			case 5:
 				program_chip(file_name);
 			    break;
@@ -96,7 +105,7 @@ void main_menu()
 			case 9:
 				shut_down();    
 			    break;
-			default:printf("wrong choice.Enter Again");
+			default:printf("Wrong choice. Enter Again");
 			    break;
 		}
 	}while(int_choice !=99);
@@ -143,9 +152,6 @@ void program_chip(char file_name[])
 
 	//Open file using command-line info; for reading.
 	hex_file = open_file (file_name, "rb" );
-
-	// Strange, this has to happen to get a response from the device.
-	reset_device();
 
 	// Sizes file to be used in data handling.
 	fileSize = file_sizer(hex_file);
@@ -413,66 +419,6 @@ uint8_t tx_data(uint8_t string[], int txString_size, bool printOrNot, int freque
 	clearConsole();
 	return 0;
 }
-
-
-
-int FTDI_State_Machine(int state, int FT_Attempts)
-{
-	switch(state)
-	{
-		case FTDI_SM_OPEN: 
-			// Loop for command attempts.
-			for (int i = 0; i < FT_Attempts; ++i)
-			{
-				// FT command
-				FT_Open(0, &devInfo[connected_device_num].ftHandle);
-				if (FT_status != FT_OK)
-				{
-					printf("Could not open FTDI device. Attempt %i\n", i);
-					Sleep(100);
-				}
-				else
-				{
-					return 1;
-				}
-			}
-		case FTDI_SM_RESET: 
-			for (int i = 0; i < FT_Attempts; ++i)
-			{
-				FT_ResetPort(devInfo[connected_device_num].ftHandle);
-				if (FT_status != FT_OK)
-				{
-					printf("Could not reset FTDI device. Attempt %i\n", i);
-					Sleep(100);
-				}
-				else
-				{
-					return 1;
-				}
-			}
-		case FTDI_SM_CLOSE:
-			for (int i = 0; i < FT_Attempts; ++i)
-			{
-				FT_Close(devInfo[connected_device_num].ftHandle);
-				if (FT_status != FT_OK)
-				{
-					printf("Could not close FTDI device. Attempt %i\n", i);
-					Sleep(100);
-				}
-				else
-				{
-					return 1;
-				}
-			}
-		case FTDI_SM_ERROR:
-			printf("Error in FTDI SM call.");
-			break;
-	}
-	return 0;
-}
-
-
-
 
 // Output files, for debugging purposes.
 ///////////// Debugging //////////////////////////////////////////////////////////////////////
@@ -754,7 +700,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 
 	// 2. Create intent-to-write-to-ram string: "W 268435836 512\n"
 	//snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, 128);
-	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W 268435836 %i\n", 128);
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W 268435840 %i\n", 128);
 
 	// Loops until succeeded.
 	while(successful < 3){
@@ -811,7 +757,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
 	//snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W %s %i\n", dec_address_as_string, 128);
-	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W 268435964 %i\n", 128);
+	snprintf(intent_to_write_to_ram_string, sizeof(intent_to_write_to_ram_string), "W 268435968 %i\n", 128);
 
 	// Loops until succeeded.
 	while(successful < 3){
@@ -1009,7 +955,7 @@ struct write ram_to_flash(struct write write_local, struct Data data_local)
 	snprintf(flash_address_as_string, sizeof(flash_address_as_string), "%d", dec_flash_address);
 
 	// 2. Create intent-to-write-to-ram string: "W 268435456 512\n"
-	snprintf(intent_to_write_to_flash_string, sizeof(intent_to_write_to_flash_string), "C %s 268435836 %i\n", flash_address_as_string, 256);
+	snprintf(intent_to_write_to_flash_string, sizeof(intent_to_write_to_flash_string), "C %s 268435840 %i\n", flash_address_as_string, 256);
 
 	tx_chars(intent_to_write_to_flash_string, tx_size_signed(intent_to_write_to_flash_string), PRINT, 0);
 	tx_chars("\n", sizeof("\n"), PRINT, 0);

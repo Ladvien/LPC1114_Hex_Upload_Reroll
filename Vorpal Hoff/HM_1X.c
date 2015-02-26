@@ -46,9 +46,9 @@ void HM_1X_main_menu()
 		if (version > 0)
 		{
 		printf("\n\n");
-		printf("	Version:     %i\n", version);
-		printf("	Device name: %s\n", name);
-		printf("	Baud:        %i\n", baud_rate);
+		printf("Device name: %s\n", name);
+		printf("		Version:     %i\n", version);
+		printf("		Baud:        %i\n", baud_rate);
 		}
 
 
@@ -59,7 +59,7 @@ void HM_1X_main_menu()
 		{
 			case 1:
 				get_version_info(&version);
-							get_baud_rate(&baud_rate);
+				get_baud_rate(&baud_rate);
 				get_name(name);
 
 				Sleep(200);
@@ -83,62 +83,128 @@ int get_version_info(int * local_version)
 	// Get device version
 	char char_device_info[3];
 
-	tx_data("AT+VERS?", sizeof("AT+VERS?"), PRINT, 0);
-	Sleep(100);
-	rx(NO_PARSE, NO_PRINT);
-	char * version = substr(RawRxBuffer, 8, 11);
-	strcpy(char_device_info, version);
-	Sleep(100);
-	*local_version = atoi(char_device_info);
-	printf("\nHMSoft Version: %i\n", *local_version);
-	Sleep(100);
+	int string_start = 8;
+	int i = 0;
 
+	char_device_info[0] = '\n';
+
+	// Get version info.
+	while(char_device_info[0] == '\n' && i < 3) // Did we ge anything?
+	{
+		tx_data("AT+VERS?", sizeof("AT+VERS?"), PRINT, 0);
+		Sleep(100);
+		rx(NO_PARSE, NO_PRINT);
+		strncpy(char_device_info, RawRxBuffer+string_start, 3);		
+		Sleep(100);
+		*local_version = atoi(char_device_info);
+		printf("\nHMSoft Version: %i\n", *local_version);
+		Sleep(100);
+		i++;
+	}
+	if (i > 3)
+	{
+		printf("Failed to get firmware version. Uh-oh.\n");
+		Sleep(1500);
+	}
 	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
+
 	return *local_version;
 }
 
 char get_name(char local_name_string[])
 {
+	int string_start = 8;
+	int i = 0;
+
+	local_name_string[0] = '\n';
+
 	// Get version info.
-	tx_data("AT+NAME?", sizeof("AT+NAME?"), PRINT, 0);
-	Sleep(100);
-	rx(NO_PARSE, NO_PRINT);
-	// Max name is == 12 chars.
-	//char * name = substr(RawRxBuffer, 8, 27);
-	//strcpy(local_name_string, name);
-	Sleep(100);
-	printf("\nDevice Name: %s\n", local_name_string);
-	Sleep(100);
-
+	while(local_name_string[0] == '\n' && i < 3) // Did we ge anything?
+	{
+		tx_data("AT+NAME?", sizeof("AT+NAME?"), PRINT, 0);
+		Sleep(100);
+		rx(NO_PARSE, NO_PRINT);
+		// Max name is == 12 chars.
+		strncpy(local_name_string, RawRxBuffer+string_start, 12);
+		Sleep(100);
+		printf("\nDevice Name: %s\n", local_name_string);
+		Sleep(100);
+		i++;
+	}
+	if (i > 3)
+	{
+		printf("Failed to get device name. Uh-oh.\n");
+		Sleep(1500);
+	}
 	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
-
-
 }
 
 int get_baud_rate(int * local_baud_rate)
 {
 
-	// Get device version
-	char local_baud_rate_str[12];
+	// Get baud rate. 
+	char local_baud_rate_str[10];
+	int string_start = 7;
+	int i = 0;
 
-	// Get version info.
+	local_baud_rate_str[0] = '\n';
 
-		printf("BOOOOOOOO!\n");
-	Sleep(100);
-
-	rx(NO_PARSE, NO_PRINT);
-
-
-	Sleep(100);
-		//char * baud_string_bfr = substr(RawRxBuffer, 8, 8);
-		//strcpy(local_baud_rate_str, baud_string_bfr);
+	clear_rx_buffer();
+	while(local_baud_rate_str[0] == '\n' && i < 3) // Did we ge anything?
+	{
+		Sleep(100);
+		tx_data("AT+BAUD?", sizeof("AT+BAUD?"), PRINT, 0);
+		Sleep(150);
+		rx(NO_PARSE, NO_PRINT);
+		// Max name is == 12 chars.
+		strncpy(local_baud_rate_str, RawRxBuffer+string_start, 3);
 		Sleep(100);
 		*local_baud_rate = atoi(local_baud_rate_str);
 		printf("\nBaud rate: %i\n", *local_baud_rate);
+		Sleep(400);
+		i++;
+	}
+	if (i > 3)
+	{
+		printf("Failed to get baud rate. Uh-oh.\n");
+		Sleep(1500);
+	}
 
+	switch (*local_baud_rate)
+	{
+		case 0:
+			*local_baud_rate = 9600;
+			break;
+		case 1:
+			*local_baud_rate = 19200;
+			break;
+		case 2:
+			*local_baud_rate = 38400;
+			break;
+		case 3:
+			*local_baud_rate = 57600;
+			break;
+		case 4:
+			*local_baud_rate = 115200;
+			break;
+		case 5:
+			*local_baud_rate = 4800;
+			break;
+		case 6:
+			*local_baud_rate = 2400;
+			break;
+		case 7:
+			*local_baud_rate = 1200;
+			break;
+		case 8:
+			*local_baud_rate = 230400;
+			break;
+		default:
+			*local_baud_rate = 0;
+			break;
+	}
 
-	Sleep(100);
-	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
+	clear_rx_buffer();
 	return *local_baud_rate;
 }
 

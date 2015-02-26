@@ -18,22 +18,21 @@ extern uint8_t ParsedRxBuffer[2048];
 
 void HM_1X_main_menu()
 {
-	struct hm_1x hm_1x;
+	// Device properties.
+	char name[13];
+	int version = 0;
+	int baud_rate = 0;
+	int stop_bit = 0;
+	char last_response[128];
+
 	char char_choice[3];
 	int int_choice = 0;
-	hm_1x.version = 0;
 
 	do
 	{
 		system("cls");
 		printf("\n");	
-		printf("HM-1X -- Main Menu: ");
-		if (hm_1x.version > 0)
-		{
-		printf("                Version: %i\n\n", hm_1x.version);
-		}
-		else
-		{printf("\n\n");}
+		printf("HM-1X -- Main Menu: \n\n");
 		printf("1. Get Version Info\n");
 		printf("2. Set Baud\n");
 		//printf("3. \n");
@@ -44,13 +43,26 @@ void HM_1X_main_menu()
 		//printf("8. \n");
 		printf("9. Return\n");
 
+		if (version > 0)
+		{
+		printf("\n\n");
+		printf("	Version:     %i\n", version);
+		printf("	Device name: %s\n", name);
+		printf("	Baud:        %i\n", baud_rate);
+		}
+
+
 		scanf("%s", char_choice);
 		int_choice = atoi(char_choice);
 
 		switch (int_choice)
 		{
 			case 1:
-				hm_1x = get_version_info(hm_1x);
+				get_version_info(&version);
+							get_baud_rate(&baud_rate);
+				get_name(name);
+
+				Sleep(200);
 				break; 
 			case 5:
 				check_HM_10();
@@ -66,27 +78,71 @@ void HM_1X_main_menu()
 	}while(int_choice !=99);
 }
 
-struct hm_1x get_version_info(struct hm_1x local_hm_1x)
+int get_version_info(int * local_version)
 {
 	// Get device version
 	char char_device_info[3];
-	int int_RSSI = 0;
 
-	// Get version info.
 	tx_data("AT+VERS?", sizeof("AT+VERS?"), PRINT, 0);
 	Sleep(100);
-	rx(0,0);
-	char * version = substr(RawRxBuffer,8,11);
+	rx(NO_PARSE, NO_PRINT);
+	char * version = substr(RawRxBuffer, 8, 11);
 	strcpy(char_device_info, version);
 	Sleep(100);
-	local_hm_1x.version = atoi(char_device_info);
-	printf("\nHMSoft Version: %i\n", local_hm_1x.version);
-	Sleep(5000);
+	*local_version = atoi(char_device_info);
+	printf("\nHMSoft Version: %i\n", *local_version);
+	Sleep(100);
 
-	return local_hm_1x;
+	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
+	return *local_version;
 }
 
-struct hm_1x set_hm_baud(struct hm_1x local_hm_1x)
+char get_name(char local_name_string[])
+{
+	// Get version info.
+	tx_data("AT+NAME?", sizeof("AT+NAME?"), PRINT, 0);
+	Sleep(100);
+	rx(NO_PARSE, NO_PRINT);
+	// Max name is == 12 chars.
+	//char * name = substr(RawRxBuffer, 8, 27);
+	//strcpy(local_name_string, name);
+	Sleep(100);
+	printf("\nDevice Name: %s\n", local_name_string);
+	Sleep(100);
+
+	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
+
+
+}
+
+int get_baud_rate(int * local_baud_rate)
+{
+
+	// Get device version
+	char local_baud_rate_str[12];
+
+	// Get version info.
+
+		printf("BOOOOOOOO!\n");
+	Sleep(100);
+
+	rx(NO_PARSE, NO_PRINT);
+
+
+	Sleep(100);
+		//char * baud_string_bfr = substr(RawRxBuffer, 8, 8);
+		//strcpy(local_baud_rate_str, baud_string_bfr);
+		Sleep(100);
+		*local_baud_rate = atoi(local_baud_rate_str);
+		printf("\nBaud rate: %i\n", *local_baud_rate);
+
+
+	Sleep(100);
+	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
+	return *local_baud_rate;
+}
+
+int set_hm_baud(int * local_set_baud)
 {
 
 	char char_choice[3];
@@ -225,4 +281,12 @@ char * substr(char * s, int x, int y)
     *p++ = '\0';
 
     return ret;
+}
+
+void clear_rx_buffer()
+{
+	for (int i = 0; i < sizeof(RawRxBuffer); ++i)
+	{
+		RawRxBuffer[i] = '\n';
+	}
 }

@@ -22,6 +22,7 @@ void HM_1X_main_menu()
 	char name[13];
 	int version = 0;
 	int baud_rate = 0;
+	char parity;
 	int stop_bit = 0;
 	char last_response[128];
 
@@ -48,7 +49,7 @@ void HM_1X_main_menu()
 		printf("\n\n");
 		printf("Device name: %s\n", name);
 		printf("		Version:     %i\n", version);
-		printf("		Baud:        %i\n", baud_rate);
+		printf("		Baud:        %i, %i, %C \n", baud_rate, stop_bit, parity);
 		}
 
 
@@ -59,7 +60,7 @@ void HM_1X_main_menu()
 		{
 			case 1:
 				get_version_info(&version);
-				get_baud_rate(&baud_rate);
+				get_baud_rate(&baud_rate, &stop_bit, &parity);
 				get_name(name);
 
 				Sleep(200);
@@ -139,11 +140,14 @@ char get_name(char local_name_string[])
 	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
 }
 
-int get_baud_rate(int * local_baud_rate)
+void get_baud_rate(int * local_baud_rate, int * local_stop_bit, char * local_parity)
 {
 
 	// Get baud rate. 
 	char local_baud_rate_str[10];
+	char local_stop_bit_str[5];
+	char local_parity_str[5];
+
 	int string_start = 7;
 	int i = 0;
 
@@ -169,43 +173,109 @@ int get_baud_rate(int * local_baud_rate)
 		printf("Failed to get baud rate. Uh-oh.\n");
 		Sleep(1500);
 	}
-
-	switch (*local_baud_rate)
-	{
-		case 0:
-			*local_baud_rate = 9600;
-			break;
-		case 1:
-			*local_baud_rate = 19200;
-			break;
-		case 2:
-			*local_baud_rate = 38400;
-			break;
-		case 3:
-			*local_baud_rate = 57600;
-			break;
-		case 4:
-			*local_baud_rate = 115200;
-			break;
-		case 5:
-			*local_baud_rate = 4800;
-			break;
-		case 6:
-			*local_baud_rate = 2400;
-			break;
-		case 7:
-			*local_baud_rate = 1200;
-			break;
-		case 8:
-			*local_baud_rate = 230400;
-			break;
-		default:
-			*local_baud_rate = 0;
-			break;
+	else{
+		switch (*local_baud_rate)
+		{
+			case 0:
+				*local_baud_rate = 9600;
+				break;
+			case 1:
+				*local_baud_rate = 19200;
+				break;
+			case 2:
+				*local_baud_rate = 38400;
+				break;
+			case 3:
+				*local_baud_rate = 57600;
+				break;
+			case 4:
+				*local_baud_rate = 115200;
+				break;
+			case 5:
+				*local_baud_rate = 4800;
+				break;
+			case 6:
+				*local_baud_rate = 2400;
+				break;
+			case 7:
+				*local_baud_rate = 1200;
+				break;
+			case 8:
+				*local_baud_rate = 230400;
+				break;
+			default:
+				*local_baud_rate = 0;
+				break;
+		}
 	}
 
 	clear_rx_buffer();
-	return *local_baud_rate;
+
+	string_start = 7;
+	i = 0;
+	local_stop_bit_str[0] = '\n';
+
+	while(local_stop_bit_str[0] == '\n' && i < 3) // Did we ge anything?
+	{
+		Sleep(100);
+		tx_data("AT+STOP?", sizeof("AT+STOP?"), PRINT, 0);
+		Sleep(150);
+		rx(NO_PARSE, NO_PRINT);
+		// Max name is == 12 chars.
+		strncpy(local_stop_bit_str, RawRxBuffer+string_start, 2);
+		Sleep(100);
+		*local_stop_bit = atoi(local_stop_bit_str);
+		printf("\nStop bits: %i\n", *local_stop_bit);
+		Sleep(900);
+		i++;
+	}
+	if (i > 3)
+	{
+		printf("Failed to get stop bit. Uh-oh.\n");
+		Sleep(1500);
+	}
+
+
+	string_start = 7;
+	i = 0;
+	local_parity_str[0] = '\n';
+	int int_pari_bfr = 0;
+
+	while(local_parity_str[0] == '\n' && i < 3) // Did we ge anything?
+	{
+		Sleep(100);
+		tx_data("AT+PARI?", sizeof("AT+PARI?"), PRINT, 0);
+		Sleep(150);
+		rx(NO_PARSE, NO_PRINT);
+		// Max name is == 12 chars.
+		strncpy(local_parity_str, RawRxBuffer+string_start, 2);
+		Sleep(100);
+		int_pari_bfr = atoi(local_parity_str);
+		printf("\nParity: %i\n", int_pari_bfr);
+		Sleep(900);
+		i++;
+	}
+	if (i > 3)
+	{
+		printf("Failed to get parity. Uh-oh.\n");
+		Sleep(1500);
+	}
+	else
+	{
+		switch(int_pari_bfr)
+		{
+			case 0:
+				*local_parity = 'N';
+				break;
+			case 1:
+				*local_parity = 'E';
+				break;
+			case 2:
+				*local_parity = 'O';
+				break;
+		}
+	}
+
 }
 
 int set_hm_baud(int * local_set_baud)

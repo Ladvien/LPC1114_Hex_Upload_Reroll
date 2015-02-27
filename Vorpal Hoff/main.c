@@ -118,7 +118,9 @@ void shut_down()
 	fclose ( hexDataFile );
 	fclose ( debug );
 	clearConsole();
-	printf("\nGood-bye.\n");
+	printf("\n\"Hot glue!!\" --Hoff70\n");
+	//printf("In memory of Johnathan Hoffman\n1968 - 2015\n");
+
 	exit(0);
 }
 

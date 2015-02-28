@@ -61,5 +61,6 @@ bool connect_device(int * local_baud_rate);
 bool close_device(int * local_baud_rate);
 bool reset_device(int * local_baud_rate);
 bool set_baud_rate(int * local_baud_rate);
+bool set_baud_rate_auto(int * local_baud_rate);
 
 #endif /* FTDI_helper.h */

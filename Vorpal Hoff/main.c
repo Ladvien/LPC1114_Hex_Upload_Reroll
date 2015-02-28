@@ -118,7 +118,7 @@ void shut_down()
 	fclose ( hexDataFile );
 	fclose ( debug );
 	clearConsole();
-	printf("\n\"Hot glue!!\" --Hoff70\n");
+	printf("\n\"Hot glue!!\" --Hoff70\n  1968 - 2015\n");
 	//printf("In memory of Johnathan Hoffman\n1968 - 2015\n");
 
 	exit(0);
@@ -177,7 +177,7 @@ void program_chip(char file_name[])
 	decode_three(decoded_bytes, '%','`','^','H');
 
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
-	wake_devices();
+	bool HM_1X_awake = ping();
 
 	printf("Mid: %.3f\n", timer());
 

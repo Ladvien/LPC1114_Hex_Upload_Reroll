@@ -29,13 +29,18 @@ int get_version_info(int * local_version);
 char get_name(char local_name_string[]);
 void get_baud_rate(int * local_baud_rate, int * local_stop_bit, char * local_parity);
 void get_mode(int * local_mode);
+void get_role(int * role);
 void get_characteristics(char local_characteristics[]);
 void get_mac_address(char local_mac_address[]);
+int detect_hm1x_baud();
+
 
 // HM-1X SET commands
-int set_hm_baud(int *  local_set_baud);
-void wake_devices();
+bool set_hm_baud(int * local_baud_rate);
+bool ping();
 void check_HM_10();
+void reset_hm1x();
+
 
 // Print info.
 void print_basic_info(char name[],
@@ -43,6 +48,7 @@ void print_basic_info(char name[],
 	int * baud_rate,
 	char * parity, 
 	int * stop_bit, 
+	int * role,
 	int * mode, 
 	char last_response[],
 	char characteristics[],

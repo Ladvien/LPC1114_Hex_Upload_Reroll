@@ -250,7 +250,8 @@ bool connect_device(int * local_baud_rate)
 bool close_device(int * local_baud_rate)
 {
 	FT_Close(devInfo[connected_device_num].ftHandle);
-	*local_baud_rate = 0;
+
+	FT_SetBaudRate(devInfo[connected_device_num].ftHandle, *local_baud_rate);
 
 	if (FT_status != FT_OK)
 	{
@@ -268,8 +269,10 @@ bool close_device(int * local_baud_rate)
 bool reset_device(int * local_baud_rate)
 {
 	FT_ResetPort(devInfo[connected_device_num].ftHandle);
-	*local_baud_rate = 0;
-	
+	Sleep(50);
+	FT_SetBaudRate(devInfo[connected_device_num].ftHandle, *local_baud_rate);
+	Sleep(50);
+
 	if (FT_status != FT_OK)
 	{
 		printf("Could not reset FTDI device.\n");
@@ -331,6 +334,23 @@ bool set_baud_rate(int * local_baud_rate)
 	}
 
 	FT_SetBaudRate(devInfo[connected_device_num].ftHandle, *local_baud_rate);
+	if (FT_OK != FT_OK)
+	 {
+	 	printf("Unable to change baud-rate\n");
+	 	Sleep(3000);
+	 	return false;
+	 } 
+	 else
+	 {
+	 	return true;
+	 }
+	 return false;
+}
+
+bool set_baud_rate_auto(int * local_baud_rate)
+{
+	FT_SetBaudRate(devInfo[connected_device_num].ftHandle, *local_baud_rate);
+	
 	if (FT_OK != FT_OK)
 	 {
 	 	printf("Unable to change baud-rate\n");

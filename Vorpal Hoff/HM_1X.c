@@ -15,9 +15,12 @@ extern DWORD BytesReceived;
 extern uint8_t RawRxBuffer[2048];
 extern uint8_t ParsedRxBuffer[2048];
 
+const int hm_baud_lookup[] = {9600, 19200, 38400, 57600, 115200, 230400};
 
 void HM_1X_main_menu()
 {
+
+
 	// Device properties.
 	char name[13];
 	int version = 0;
@@ -25,13 +28,16 @@ void HM_1X_main_menu()
 	char parity;
 	int stop_bit = 0;
 	int mode = 0;
+	int role = 0;
 	char last_response[128];
 	char characteristics[5];
 	char mac_address_str[16];
 
 	char char_choice[3];
 	int int_choice = 0;
-
+	
+	baud_rate = detect_hm1x_baud();
+	
 	do
 	{
 		system("cls");
@@ -55,12 +61,11 @@ void HM_1X_main_menu()
 		&baud_rate,
 		&parity, 
 		&stop_bit, 
-		&mode, 
+		&mode,
+		&role, 
 		last_response,
 		characteristics,
 		mac_address_str);
-
-
 
 		scanf("%s", char_choice);
 		int_choice = atoi(char_choice);
@@ -74,7 +79,9 @@ void HM_1X_main_menu()
 				get_mode(&mode);
 				get_characteristics(characteristics);
 				get_mac_address(mac_address_str);
-				Sleep(200);
+				break;
+			case 2:
+				if(set_hm_baud(&baud_rate) == true){get_baud_rate(&baud_rate, &stop_bit, &parity);}
 				break; 
 			case 5:
 				check_HM_10();
@@ -98,18 +105,18 @@ int get_version_info(int * local_version)
 	int string_start = 8;
 	int i = 0;
 
-	char_device_info[0] = '\n';
+	char_device_info[0] = '\0';
 
 	// Get version info.
-	while(char_device_info[0] == '\n' && i < 3) // Did we ge anything?
+	while(char_device_info[0] == '\0' && i < 3) // Did we ge anything?
 	{
-		tx_data("AT+VERS?", sizeof("AT+VERS?"), PRINT, 0);
+		tx_data("AT+VERS?", sizeof("AT+VERS?"), NO_PRINT, 0);
 		Sleep(100);
 		rx(NO_PARSE, NO_PRINT);
 		strncpy(char_device_info, RawRxBuffer+string_start, 3);		
 		Sleep(100);
 		*local_version = atoi(char_device_info);
-		printf("\nHMSoft Version: %i\n", *local_version);
+		printf("HMSoft Version: %i\n", *local_version);
 		Sleep(100);
 		i++;
 	}
@@ -118,7 +125,7 @@ int get_version_info(int * local_version)
 		printf("Failed to get firmware version. Uh-oh.\n");
 		Sleep(1500);
 	}
-	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
+	clear_rx_buffer();
 
 	return *local_version;
 }
@@ -128,18 +135,18 @@ char get_name(char local_name_string[])
 	int string_start = 8;
 	int i = 0;
 
-	local_name_string[0] = '\n';
+	local_name_string[0] = '\0';
 
 	// Get version info.
-	while(local_name_string[0] == '\n' && i < 3) // Did we ge anything?
+	while(local_name_string[0] == '\0' && i < 3) // Did we ge anything?
 	{
-		tx_data("AT+NAME?", sizeof("AT+NAME?"), PRINT, 0);
+		tx_data("AT+NAME?", sizeof("AT+NAME?"), NO_PRINT, 0);
 		Sleep(100);
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
 		strncpy(local_name_string, RawRxBuffer+string_start, 12);
 		Sleep(100);
-		printf("\nDevice Name: %s\n", local_name_string);
+		printf("Device Name: %s\n", local_name_string);
 		Sleep(100);
 		i++;
 	}
@@ -148,7 +155,7 @@ char get_name(char local_name_string[])
 		printf("Failed to get device name. Uh-oh.\n");
 		Sleep(1500);
 	}
-	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
+	clear_rx_buffer();
 }
 
 void get_baud_rate(int * local_baud_rate, int * local_stop_bit, char * local_parity)
@@ -162,19 +169,19 @@ void get_baud_rate(int * local_baud_rate, int * local_stop_bit, char * local_par
 	int string_start = 7;
 	int i = 0;
 
-	local_baud_rate_str[0] = '\n';
+	local_baud_rate_str[0] = '\0';
 
 	clear_rx_buffer();
-	while(local_baud_rate_str[0] == '\n' && i < 3) // Did we ge anything?
+	while(local_baud_rate_str[0] == '\0' && i < 3) // Did we ge anything?
 	{
 		Sleep(100);
-		tx_data("AT+BAUD?", sizeof("AT+BAUD?"), PRINT, 0);
+		tx_data("AT+BAUD?", sizeof("AT+BAUD?"), NO_PRINT, 0);
 		Sleep(150);
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
 		strncpy(local_baud_rate_str, RawRxBuffer+string_start, 3);
 		*local_baud_rate = atoi(local_baud_rate_str);
-		printf("\nBaud rate: %i\n", *local_baud_rate);
+		printf("Baud rate: %i\n", *local_baud_rate);
 		i++;
 	}
 	if (i > 3)
@@ -200,15 +207,6 @@ void get_baud_rate(int * local_baud_rate, int * local_stop_bit, char * local_par
 			case 4:
 				*local_baud_rate = 115200;
 				break;
-			case 5:
-				*local_baud_rate = 4800;
-				break;
-			case 6:
-				*local_baud_rate = 2400;
-				break;
-			case 7:
-				*local_baud_rate = 1200;
-				break;
 			case 8:
 				*local_baud_rate = 230400;
 				break;
@@ -222,18 +220,18 @@ void get_baud_rate(int * local_baud_rate, int * local_stop_bit, char * local_par
 
 	string_start = 7;
 	i = 0;
-	local_stop_bit_str[0] = '\n';
+	local_stop_bit_str[0] = '\0';
 
-	while(local_stop_bit_str[0] == '\n' && i < 3) // Did we ge anything?
+	while(local_stop_bit_str[0] == '\0' && i < 3) // Did we ge anything?
 	{
 		Sleep(100);
-		tx_data("AT+STOP?", sizeof("AT+STOP?"), PRINT, 0);
+		tx_data("AT+STOP?", sizeof("AT+STOP?"), NO_PRINT, 0);
 		Sleep(150);
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
 		strncpy(local_stop_bit_str, RawRxBuffer+string_start, 2);
 		*local_stop_bit = atoi(local_stop_bit_str);
-		printf("\nStop bits: %i\n", *local_stop_bit);
+		printf("Stop bits: %i\n", *local_stop_bit);
 		i++;
 	}
 	if (i > 3)
@@ -245,19 +243,19 @@ void get_baud_rate(int * local_baud_rate, int * local_stop_bit, char * local_par
 
 	string_start = 7;
 	i = 0;
-	local_parity_str[0] = '\n';
+	local_parity_str[0] = '\0';
 	int int_pari_bfr = 0;
 
-	while(local_parity_str[0] == '\n' && i < 3) // Did we ge anything?
+	while(local_parity_str[0] == '\0' && i < 3) // Did we ge anything?
 	{
 		Sleep(100);
-		tx_data("AT+PARI?", sizeof("AT+PARI?"), PRINT, 0);
+		tx_data("AT+PARI?", sizeof("AT+PARI?"), NO_PRINT, 0);
 		Sleep(150);
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
 		strncpy(local_parity_str, RawRxBuffer+string_start, 2);
 		int_pari_bfr = atoi(local_parity_str);
-		printf("\nParity: %i\n", int_pari_bfr);
+		printf("Parity: %i\n", int_pari_bfr);
 		i++;
 	}
 	if (i > 3)
@@ -290,19 +288,19 @@ void get_mode(int * local_mode)
 	int string_start = 7;
 	int i = 0;
 
-	local_mode_str[0] = '\n';
+	local_mode_str[0] = '\0';
 
 	clear_rx_buffer();
-	while(local_mode_str[0] == '\n' && i < 3) // Did we ge anything?
+	while(local_mode_str[0] == '\0' && i < 3) // Did we ge anything?
 	{
 		Sleep(100);
-		tx_data("AT+MODE?", sizeof("AT+MODE?"), PRINT, 0);
+		tx_data("AT+MODE?", sizeof("AT+MODE?"), NO_PRINT, 0);
 		Sleep(150);
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
 		strncpy(local_mode_str, RawRxBuffer+string_start, 3);
 		*local_mode = atoi(local_mode_str);
-		printf("\nMode rate: %i\n", *local_mode);
+		printf("Mode rate: %i\n", *local_mode);
 		i++;
 	}
 	if (i > 3)
@@ -316,103 +314,83 @@ void get_mode(int * local_mode)
 
 void get_characteristics(char local_characteristics[])
 {
-	int string_start = 8;
+	int string_start = 9;
 	int i = 0;
 
-	local_characteristics[0] = '\n';
+	local_characteristics[0] = '\0';
 
 	// Get version info.
-	while(local_characteristics[0] == '\n' && i < 3) // Did we ge anything?
+	while(local_characteristics[0] == '\0' && i < 3) // Did we ge anything?
 	{
-		tx_data("AT+CHAR?", sizeof("AT+CHAR?"), PRINT, 0);
+		tx_data("AT+CHAR?", sizeof("AT+CHAR?"), NO_PRINT, 0);
 		Sleep(100);
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
-		strncpy(local_characteristics, RawRxBuffer+string_start, 5);
+		strncpy(local_characteristics, RawRxBuffer+string_start, 4);
 		Sleep(100);
-		printf("\nDevice Name: %s\n", local_characteristics);
+		local_characteristics[4] = '\0';
+		printf("Device Characteristics: %s\n", local_characteristics);
 		Sleep(100);
 		i++;
 	}
 	if (i > 3)
 	{
-		printf("Failed to get device name. Uh-oh.\n");
+		printf("Failed to get characteristics. Uh-oh.\n");
 		Sleep(1500);
 	}
-	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
-
+	clear_rx_buffer();
 }
 
-int set_hm_baud(int * local_set_baud)
+
+void get_role(int * local_role)
 {
+	char role_str[4];
 
-	char char_choice[3];
-	int int_choice = 0;
+	int string_start = 7;
+	int i = 0;
 
-	do
+	role_str[0] = '\0';
+
+
+	while(role_str[0] == '\0' && i < 3) // Did we ge anything?
 	{
-		system("cls");
-		printf("\n");	
-		printf("HM-1X -- Main Menu: \n\n");
-		printf("1. Get Version Info\n");
-		printf("2. Set Baud\n");
-		//printf("3. \n");
-		//printf("4. \n");
-		printf("5. RSSI\n");
-		//printf("6. \n");
-		//printf("7. \n");
-		//printf("8. \n");
-		printf("9. Return\n");
-
-		scanf("%s", char_choice);
-		int_choice = atoi(char_choice);
-
-		switch (int_choice)
-		{
-			case 1:
-				//hm_1x = get_version_info(hm_1x);
-				break; 
-			case 5:
-				//check_HM_10();
-			    break;
-			case 6:
-			    break;
-			case 9:
-				//main_menu();    
-			    break;
-			default:printf("wrong choice.Enter Again");
-			    break;
-		}
-	}while(int_choice !=99);
-
-	// Get device version
-	char char_device_info[5];
-	int int_RSSI = 0;
-
-	// Get version info.
-	tx_data("AT", sizeof("AT"), PRINT, 0);
-	Sleep(300);
-
-	rx(1, 1);
+		Sleep(100);
+		tx_data("AT+MODE?", sizeof("AT+MODE?"), NO_PRINT, 0);
+		Sleep(150);
+		rx(NO_PARSE, NO_PRINT);
+		// Max name is == 12 chars.
+		strncpy(role_str, RawRxBuffer+string_start, 3);
+		*local_role = atoi(role_str);
+		printf("Mode: %i\n", *local_role);
+		i++;
+	}
+	if (i > 3)
+	{
+		printf("Failed to get mode. Uh-oh.\n");
+		Sleep(1500);
+	}
+	clear_rx_buffer();
 }
+
 
 void get_mac_address(char local_mac_address[])
 {
 	int string_start = 8;
 	int i = 0;
 
-	local_mac_address[0] = '\n';
+	local_mac_address[0] = '\0';
 
 	// Get version info.
-	while(local_mac_address[0] == '\n' && i < 3) // Did we ge anything?
+	while(local_mac_address[0] == '\0' && i < 3) // Did we ge anything?
 	{
-		tx_data("AT+ADDR?", sizeof("AT+ADDR?"), PRINT, 0);
+		tx_data("AT+ADDR?", sizeof("AT+ADDR?"), NO_PRINT, 0);
 		Sleep(100);
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
 		strncpy(local_mac_address, RawRxBuffer+string_start, 12);
+		local_mac_address[12] = '\n';
 		Sleep(100);
-		printf("\nMac address: %s\n", local_mac_address);
+		printf("Mac address: %s\n", local_mac_address);
 		Sleep(100);
 		i++;
 	}
@@ -421,17 +399,164 @@ void get_mac_address(char local_mac_address[])
 		printf("Failed to mac address. Uh-oh.\n");
 		Sleep(1500);
 	}
-	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
+	clear_rx_buffer();
 
 }
 
-void wake_devices()
+bool set_hm_baud(int * local_baud_rate)
 {
+	char baud_set_str[8];
+	int ftdi_baud_rate = 0;
+
+	char char_choice[3];
+	int int_choice = 0;
+
+	*local_baud_rate = detect_hm1x_baud();
+
+	system("cls");
+	printf("\n");	
+	printf("Current HM-1X Baud rate: %i\n", *local_baud_rate);
+	printf("HM-1X -- Set Baud: \n\n");
+	printf("1. 9600\n");
+	printf("2. 19200\n");
+	printf("3. 38400\n");
+	printf("4. 57600\n");
+	printf("5. 115200\n");
+	printf("6. 230400\n");
+	printf("10. Return\n");
+
+	scanf("%s", char_choice);
+	int_choice = atoi(char_choice);
+
+	switch (int_choice)
+	{
+		case 1:
+			sprintf(baud_set_str, "AT+BAUD0");
+			ftdi_baud_rate = 9600;
+			break; 
+		case 2:
+			sprintf(baud_set_str, "AT+BAUD1");
+			ftdi_baud_rate = 19200;
+			break;
+		case 3:
+			sprintf(baud_set_str, "AT+BAUD2");
+			ftdi_baud_rate = 38400;
+			break; 
+		case 4:
+			sprintf(baud_set_str, "AT+BAUD3");
+			ftdi_baud_rate = 57600;
+			break;
+		case 5:
+			sprintf(baud_set_str, "AT+BAUD4");
+			ftdi_baud_rate = 115200;
+			break;
+		case 6:
+			sprintf(baud_set_str, "AT+BAUD8");
+			ftdi_baud_rate = 230400;
+			break; 		
+		case 10:    
+		    break;
+		default:printf("wrong choice.Enter Again");
+		    break;
+	}
+
+	// If we leave menu, don't write nuthin'.
+	if(int_choice < 7)
+	{
+		bool changed_baud;
+		int count = 0;
+
+		while(!changed_baud && count < 5)
+		{
+			printf("Attempting to set baud rate.\n");
+			tx_data(baud_set_str, 9, NO_PRINT, 0);
+			Sleep(100);
+			rx(1, NO_PRINT);
+			Sleep(120);
+			reset_hm1x();
+			Sleep(120);
+			clear_rx_buffer();
+			rx(0, NO_PRINT);
+			Sleep(50);
+			set_baud_rate_auto(&ftdi_baud_rate);
+			Sleep(100);
+			changed_baud = ping();
+			count++;
+		}
+
+		if (changed_baud)
+		{	
+			*local_baud_rate = ftdi_baud_rate;
+			return true;
+		}
+		else
+		{
+			printf("Failed to change baud\n");
+			Sleep(300);
+		}		
+	}
+	return false;
+}
+
+
+
+int detect_hm1x_baud()
+{
+	// 1. Setup local baud rate lookup.
+	// 2. 
+
+	char ok_str[3];
+	int local_baud_lookup[8];
+	int current_hm_baud_rate = 0;
+
+	for (int i = 0; i < 6; ++i)
+	{
+		local_baud_lookup[i] = hm_baud_lookup[i];
+	}
+
+	for (int i = 0; i < 6; ++i)
+	{
+		set_baud_rate_auto(&local_baud_lookup[i]);
+		reset_device(&local_baud_lookup[i]);
+
+		tx_data("AT", sizeof("AT"), NO_PRINT, 0);
+		Sleep(130);
+		rx(0, 0);
+		if (RawRxBuffer[0] == 'O' && RawRxBuffer[1] == 'K')
+		{
+			printf("%i\n", local_baud_lookup[i]);
+			current_hm_baud_rate = local_baud_lookup[i];
+			break;
+		}
+	}
+	clear_rx_buffer();
+	printf("Local baud rate: %i\n", current_hm_baud_rate);
+	Sleep(100);
+	return current_hm_baud_rate;
+}
+
+void reset_hm1x()
+{
+	printf("Resetting the HM-1X.\n");
+	tx_data("AT+RESET", sizeof("AT+RESET"), NO_PRINT, 0);
+	Sleep(180);
+	rx(0, 0);
+	clear_rx_buffer();
+}
+
+bool ping()
+{
+	clear_rx_buffer();
 	// Meant to activate UART flow on devices
-	tx_chars("Wake", sizeof("Wake"), NO_PRINT, 10);
-	Sleep(500);
-	rx(NO_PARSE, PRINT);
-	printf("Waking Devices...\n");
+	tx_data("AT", sizeof("AT"), NO_PRINT, 1);
+	Sleep(150);
+	rx(0, 0);
+	if (RawRxBuffer[0] == 'O' && RawRxBuffer[1] == 'K')
+	{
+		clear_rx_buffer();
+		return true;
+	}
+	return false;
 }
 
 void check_HM_10()
@@ -442,7 +567,7 @@ void check_HM_10()
 	int int_RSSI = 0;
 
 	// An HM-10 command to get RSSI.
-	tx_chars("AT+RSSI?", sizeof("AT+RSSI?"), PRINT, 0);
+	tx_chars("AT+RSSI?", sizeof("AT+RSSI?"), NO_PRINT, 0);
 	Sleep(500);
 
 	FT_GetStatus(devInfo[connected_device_num].ftHandle, &RxBytes, &TxBytes, &EventDWord);
@@ -499,7 +624,8 @@ void print_basic_info(char name[],
 	int * baud_rate,
 	char * parity, 
 	int * stop_bit, 
-	int * mode, 
+	int * mode,
+	int * role, 
 	char last_response[],
 	char characteristics[],
 	char mac_address_str[])
@@ -511,6 +637,15 @@ void print_basic_info(char name[],
 		printf("Device name: %s\n", name);
 		printf("		Firmware Vers:   %i\n", *version);
 		printf("		Baud:            %i, %i, %C \n", *baud_rate, *stop_bit, *parity);
+		switch(*role)
+		{
+		case 0:
+		printf("		Mode:            Peripheral\n");
+			break;
+		case 1:
+		printf("		Mode:            Master\n");
+			break;
+		}
 		switch(*mode)
 		{
 		case 0:
@@ -523,8 +658,7 @@ void print_basic_info(char name[],
 		printf("		Mode:            Remote\n");
 			break;	
 		}
-		printf("		Characteristics: %C%C%C%C\n", characteristics[1],
-					 characteristics[2], characteristics[3], characteristics[4]);
+		printf("		Characteristics: %s\n", characteristics);
 		printf("		Mac Address:     ");
 		for (int i = 0; i < 12; i)
 		{
@@ -540,12 +674,16 @@ void print_basic_info(char name[],
 		}
 		printf("\n");
 		}
+		else
+		{
+		printf("	 Auto-detected Baud: %i\n", *baud_rate);	
+		}
 }
 
 void clear_rx_buffer()
 {
 	for (int i = 0; i < sizeof(RawRxBuffer); ++i)
 	{
-		RawRxBuffer[i] = '\n';
+		RawRxBuffer[i] = '\0';
 	}
 }

@@ -57,7 +57,7 @@ void HM_1X_main_menu()
 		printf("HM-1X -- Main Menu: \n\n");
 		printf("1. Get Basic Info\n");
 		printf("2. Set Baud\n");
-		//printf("3. \n");
+		printf("3. Set name\n");
 		//printf("4. \n");
 		printf("5. RSSI\n");
 		//printf("6. \n");
@@ -92,6 +92,10 @@ void HM_1X_main_menu()
 				break;
 			case 2:
 				if(set_hm_baud(&baud_rate) == true){get_baud_rate(&baud_rate, &stop_bit, &parity);}
+				break;
+			case 3:
+				set_name(name);
+
 				break; 
 			case 5:
 				check_HM_10();
@@ -558,6 +562,62 @@ bool set_hm_baud(int * local_baud_rate)
 	return false;
 }
 
+void set_name(char name[])
+{
+	char response[24];
+	char new_name[12];
+	char send_string[20];
+	int i = 0;
+
+	system("cls");
+	printf("\n");	
+	printf("Current HM-1X name: %s\n", name);
+	printf("HM-1X -- Set new name: \n\n");
+
+	send_string[0] = '\0';
+	int c;
+	while((c = getchar()) != EOF) 
+	    if (c == '\n') 
+	        break;
+	fgets(new_name, 12, stdin);
+	//scanf("%11", new_name);
+	//for (int i = 0; i < 11; ++i)
+	//{
+	//	if (new_name[i] == ' ')
+	//	{
+	//		new_name[i] = '_';
+	//	}
+	//}
+	sprintf(send_string, "AT+NAME%s", new_name);	
+	
+	response[0] = '\0';
+
+	// Get version info.
+	while(response[0] == '\0' && i < 3) // Did we ge anything?
+	{
+		tx_data(send_string, 11, PRINT, 0);
+		Sleep(100);
+		rx(NO_PARSE, PRINT);
+		// Max name is == 12 chars.
+		strncpy(response, RawRxBuffer, 24);
+		Sleep(100);
+		printf("%s\n", response);
+		Sleep(100);
+		i++;
+	}
+	if (i > 3)
+	{
+		printf("Failed to change name. Sure you're the dad?\n");
+		Sleep(1500);
+	}
+	else
+	{
+		get_name(name);
+	}
+	//while((c = getchar()) != EOF) 
+    //if (c == '\n') 
+    //   break;
+}
 
 
 int detect_hm1x_baud()
@@ -746,4 +806,12 @@ void clear_rx_buffer()
 	{
 		RawRxBuffer[i] = '\0';
 	}
+}
+
+void flush_stdin()
+{
+	int c;
+	while((c = getchar()) != EOF) 
+    if (c == '\n') 
+        break;
 }

@@ -40,7 +40,7 @@ bool set_hm_baud(int * local_baud_rate);
 bool ping();
 void check_HM_10();
 void reset_hm1x();
-
+void set_name(char name[]);
 
 // Print info.
 void print_basic_info(char name[],
@@ -56,6 +56,6 @@ void print_basic_info(char name[],
 
 // Clearing the RX buffer
 void clear_rx_buffer();
-
+void flush_stdin();
 
 #endif /* HM-1X */

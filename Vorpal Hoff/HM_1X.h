@@ -25,8 +25,8 @@
 
 // HM-1X GET commands
 void HM_1X_main_menu();
-int get_version_info(int * local_version);
-char get_name(char local_name_string[]);
+void get_version_info(int * local_version);
+void get_name(char local_name_string[]);
 void get_baud_rate(int * local_baud_rate, int * local_stop_bit, char * local_parity);
 void get_mode(int * local_mode);
 void get_role(int * role);

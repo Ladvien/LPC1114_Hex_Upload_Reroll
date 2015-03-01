@@ -3,6 +3,8 @@
 #include "FTDI_helper.h"
 
 extern FT_DEVICE_LIST_INFO_NODE *devInfo;
+extern bool FTDI_open_flag;
+
 
 extern int command_response_code;
 
@@ -19,8 +21,6 @@ const int hm_baud_lookup[] = {9600, 19200, 38400, 57600, 115200, 230400};
 
 void HM_1X_main_menu()
 {
-
-
 	// Device properties.
 	char name[13];
 	int version = 0;
@@ -31,12 +31,24 @@ void HM_1X_main_menu()
 	int role = 0;
 	char last_response[128];
 	char characteristics[5];
-	char mac_address_str[16];
+	char mac_address_str[13];
 
+	// Menu variables
 	char char_choice[3];
 	int int_choice = 0;
 	
+	// Auto find the current baud of the HM-1X.
 	baud_rate = detect_hm1x_baud();
+
+	if (baud_rate)
+	{
+		get_version_info(&version);
+		get_baud_rate(&baud_rate, &stop_bit, &parity);
+		get_name(name);
+		get_mode(&mode);
+		get_characteristics(characteristics);
+		get_mac_address(mac_address_str);
+	}
 	
 	do
 	{
@@ -52,8 +64,6 @@ void HM_1X_main_menu()
 		//printf("7. \n");
 		//printf("8. \n");
 		printf("9. Return\n");
-
-
 
 		print_basic_info(
 		name,
@@ -91,15 +101,21 @@ void HM_1X_main_menu()
 			case 9:
 				main_menu();    
 			    break;
-			default:printf("wrong choice.Enter Again");
+			default:printf("Uh, no, sir!");
 			    break;
 		}
 	}while(int_choice !=99);
 }
 
-int get_version_info(int * local_version)
+void get_version_info(int * local_version)
 {
-	// Get device version
+	// 1. Send the command to get HM-1X firmware version.
+	// 2. Get the response.
+	// 3. Take just the 3 number version from RX chars.
+	// 4. Convert the chars to a single integer.
+	// 5. Repeat the command 3 times or until success.
+	// 6. Load the version as integer into device property.
+
 	char char_device_info[3];
 
 	int string_start = 8;
@@ -125,13 +141,18 @@ int get_version_info(int * local_version)
 		printf("Failed to get firmware version. Uh-oh.\n");
 		Sleep(1500);
 	}
+	// Don't leave data in buffer.
 	clear_rx_buffer();
-
-	return *local_version;
 }
 
-char get_name(char local_name_string[])
+void get_name(char local_name_string[])
 {
+	// 1. Send the command to get HM-1X name, which is 12 characters.
+	// 2. Get the response.
+	// 3. Take the 12 characters and make a string.
+	// 4. Repeat the command 3 times or until success.
+	// 5. Put the string in a device property.
+	
 	int string_start = 8;
 	int i = 0;
 
@@ -150,6 +171,8 @@ char get_name(char local_name_string[])
 		Sleep(100);
 		i++;
 	}
+	// Assure string.
+	local_name_string[12] = '\0';
 	if (i > 3)
 	{
 		printf("Failed to get device name. Uh-oh.\n");
@@ -160,8 +183,15 @@ char get_name(char local_name_string[])
 
 void get_baud_rate(int * local_baud_rate, int * local_stop_bit, char * local_parity)
 {
+	// 1. Send the command to get HM-1X baud rate.
+	// 2. Get the response.
+	// 3. Take the 1 number version from RX chars.
+	// 4. Convert the chars to a single integer.
+	// 5. Repeat the command 3 times or until success.
+	// 6. Use baud lookup to get baud rate.
+	// 7. Load the baud-rate as integer into device property.
+	// 8. Use similiar process for stop-bits, and parity.
 
-	// Get baud rate. 
 	char local_baud_rate_str[10];
 	char local_stop_bit_str[5];
 	char local_parity_str[5];
@@ -283,7 +313,14 @@ void get_baud_rate(int * local_baud_rate, int * local_stop_bit, char * local_par
 
 void get_mode(int * local_mode)
 {
-	char local_mode_str[3];
+	// 1. Send the command to get HM-1X mode.
+	// 2. Get the response.
+	// 3. Take the 1 number version from RX chars.
+	// 4. Convert the chars to a single integer.
+	// 5. Repeat the command 3 times or until success.
+	// 7. Load the mode as integer into mode property.
+
+	char local_mode_str[2];
 
 	int string_start = 7;
 	int i = 0;
@@ -298,11 +335,12 @@ void get_mode(int * local_mode)
 		Sleep(150);
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
-		strncpy(local_mode_str, RawRxBuffer+string_start, 3);
+		strncpy(local_mode_str, RawRxBuffer+string_start, 1);
 		*local_mode = atoi(local_mode_str);
 		printf("Mode rate: %i\n", *local_mode);
 		i++;
 	}
+	local_mode_str[1] = '\0';
 	if (i > 3)
 	{
 		printf("Failed to get mode. Uh-oh.\n");
@@ -314,6 +352,13 @@ void get_mode(int * local_mode)
 
 void get_characteristics(char local_characteristics[])
 {
+	// 1. Send the command to get HM-1X characteristics.
+	// 2. Get the response.
+	// 3. Take the 4 character version from RX chars.
+	// 4. Convert the chars to a string.
+	// 5. Repeat the command 3 times or until success.
+	// 7. Load the string into characteristics property.
+	
 	int string_start = 9;
 	int i = 0;
 
@@ -326,25 +371,31 @@ void get_characteristics(char local_characteristics[])
 		Sleep(100);
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
-		strncpy(local_characteristics, RawRxBuffer+string_start, 4);
+		strncpy(local_characteristics, RawRxBuffer+string_start, 5);
 		Sleep(100);
-		local_characteristics[4] = '\0';
-		printf("Device Characteristics: %s\n", local_characteristics);
+		printf("Device characteristics: %s\n", local_characteristics);
 		Sleep(100);
 		i++;
 	}
 	if (i > 3)
 	{
-		printf("Failed to get characteristics. Uh-oh.\n");
+		printf("Failed to get device name. Uh-oh.\n");
 		Sleep(1500);
 	}
-	clear_rx_buffer();
+	clear_rx_buffer(RawRxBuffer, sizeof(RawRxBuffer));
 }
 
 
 void get_role(int * local_role)
 {
-	char role_str[4];
+	// 1. Send the command to get HM-1X role.
+	// 2. Get the response.
+	// 3. Take the 1 number version from RX chars.
+	// 4. Convert the chars to a single integer.
+	// 5. Repeat the command 3 times or until success.
+	// 7. Load the role as integer into role property.
+
+	char role_str[2];
 
 	int string_start = 7;
 	int i = 0;
@@ -359,11 +410,12 @@ void get_role(int * local_role)
 		Sleep(150);
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
-		strncpy(role_str, RawRxBuffer+string_start, 3);
+		strncpy(role_str, RawRxBuffer+string_start, 1);
 		*local_role = atoi(role_str);
 		printf("Mode: %i\n", *local_role);
 		i++;
 	}
+	role_str[1] = '\0';
 	if (i > 3)
 	{
 		printf("Failed to get mode. Uh-oh.\n");
@@ -375,6 +427,13 @@ void get_role(int * local_role)
 
 void get_mac_address(char local_mac_address[])
 {
+	// 1. Send the command to get HM-1X MAC address.
+	// 2. Get the response.
+	// 3. Take the 12 character version from RX chars.
+	// 4. Convert the chars to a string.
+	// 5. Repeat the command 3 times or until success.
+	// 7. Load the string into characteristics property.
+
 	int string_start = 8;
 	int i = 0;
 
@@ -388,12 +447,13 @@ void get_mac_address(char local_mac_address[])
 		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
 		strncpy(local_mac_address, RawRxBuffer+string_start, 12);
-		local_mac_address[12] = '\n';
 		Sleep(100);
 		printf("Mac address: %s\n", local_mac_address);
 		Sleep(100);
 		i++;
 	}
+	// Assure string.
+	local_mac_address[12] = '\0';
 	if (i > 3)
 	{
 		printf("Failed to mac address. Uh-oh.\n");
@@ -630,7 +690,7 @@ void print_basic_info(char name[],
 	char characteristics[],
 	char mac_address_str[])
 {
-		
+	
 		if (*version > 0)
 		{
 		printf("\n\n");

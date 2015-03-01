@@ -10,6 +10,7 @@ FT_STATUS ftStatus;
 DWORD numDevs;
 
 extern FT_DEVICE_LIST_INFO_NODE *devInfo;
+extern bool FTDI_open_flag;
 
 void ftdi_menu()
 {

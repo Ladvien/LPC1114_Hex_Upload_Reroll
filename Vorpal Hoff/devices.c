@@ -1,5 +1,7 @@
 #include "devices.h"
 extern FT_DEVICE_LIST_INFO_NODE *devInfo;
+extern bool FTDI_open_flag;
+
 extern uint8_t ParsedRxBuffer[2048];
 extern uint8_t RawRxBuffer[2048];
 extern int command_response_code;

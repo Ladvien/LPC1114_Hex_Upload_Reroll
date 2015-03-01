@@ -16,6 +16,7 @@ DWORD RxBytes;
 DWORD BytesReceived;
 
 FT_DEVICE_LIST_INFO_NODE *devInfo;
+bool FTDI_open_flag = false;
 
 
 uint8_t RawRxBuffer[2048];

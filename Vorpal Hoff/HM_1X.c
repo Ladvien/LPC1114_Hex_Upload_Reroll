@@ -62,7 +62,7 @@ void HM_1X_main_menu()
 		printf("3. Set Name\n");
 		printf("4. Set Power Level\n");
 		printf("5. Set Mode\n");
-		//printf("6. \n");
+		printf("6. Set Role\n");
 		//printf("7. \n");
 		//printf("8. \n");
 		printf("9. Return\n");
@@ -106,6 +106,7 @@ void HM_1X_main_menu()
 				set_mode(&mode);
 			    break;
 			case 6:
+				set_role(&role);
 			    break;
 			case 9:
 				main_menu();    
@@ -355,8 +356,6 @@ void get_mode(int * local_mode)
 		printf("Failed to get mode. Uh-oh.\n");
 		Sleep(1500);
 	}
-
-
 }
 
 void get_characteristics(char local_characteristics[])
@@ -654,9 +653,74 @@ void get_power(int * local_power)
 
 }
 
-void set_role(int * role)
+void set_role(int * local_role)
 {
+	char role_set_str[8];
+	char char_choice[2];
+	int int_choice = 0;
 
+	system("cls");
+	printf("\n");	
+	printf("Current HM-1X Role: ");
+	switch(*local_role)
+	{
+	case 0:
+	printf("Peripheral.\n");
+		break;
+	case 1:
+	printf("Central.\n");
+		break;
+	} 
+
+	printf("HM-1X -- Set Role: \n\n");
+	printf("1. Peripheral\n");
+	printf("2. Central\n");
+
+
+	scanf("%s", char_choice);
+	int_choice = (atoi(char_choice)-1);
+
+	switch (int_choice)
+	{
+		case 0:
+			sprintf(role_set_str, "AT+ROLE0");
+			break; 
+		case 1:
+			sprintf(role_set_str, "AT+ROLE1");
+			break;
+		default:printf("No go on the role, buddy.");
+		    break;
+	}
+
+	// Apparently switch zeroes the variable.
+	int_choice = (atoi(char_choice)-1);
+	
+	// If we leave menu, don't write nuthin'.
+	if(int_choice < 3 && int_choice > -1)
+	{
+		bool changed_role = false;
+		int count = 0;
+
+		while(!changed_role && count < 5)
+		{
+			printf("Attempting to set role.\n");
+			tx_data(role_set_str, 9, PRINT, 0);
+			Sleep(100);
+			rx(NO_PARSE, NO_PRINT);
+			Sleep(120);
+			changed_role = ok_check();
+			count++;
+		}
+		if (changed_role)
+		{	
+			*local_role = int_choice;
+		}
+		else
+		{
+			printf("Failed to change role.  Need a model?\n");
+			Sleep(300);
+		}		
+	}
 }
 
 void set_mode(int * local_mode)

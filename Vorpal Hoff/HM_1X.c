@@ -61,7 +61,7 @@ void HM_1X_main_menu()
 		printf("2. Set Baud\n");
 		printf("3. Set Name\n");
 		printf("4. Set Power Level\n");
-		printf("5. RSSI\n");
+		printf("5. Set Mode\n");
 		//printf("6. \n");
 		//printf("7. \n");
 		//printf("8. \n");
@@ -103,7 +103,7 @@ void HM_1X_main_menu()
 				set_power(&power);
 				break;
 			case 5:
-				check_HM_10();
+				set_mode(&mode);
 			    break;
 			case 6:
 			    break;
@@ -346,7 +346,7 @@ void get_mode(int * local_mode)
 		// Max name is == 12 chars.
 		strncpy(local_mode_str, RawRxBuffer+string_start, 1);
 		*local_mode = atoi(local_mode_str);
-		printf("Mode rate: %i\n", *local_mode);
+		printf("Mode: %i\n", *local_mode);
 		i++;
 	}
 	local_mode_str[1] = '\0';
@@ -652,6 +652,87 @@ void get_power(int * local_power)
 		Sleep(1500);
 	}
 
+}
+
+void set_role(int * role)
+{
+
+}
+
+void set_mode(int * local_mode)
+{
+	char mode_set_str[8];
+	char char_choice[2];
+	int int_choice = 0;
+
+	system("cls");
+	printf("\n");	
+	printf("Current HM-1X Mode: ");
+	switch(*local_mode)
+	{
+	case 0:
+	printf("Transmission.\n");
+		break;
+	case 1:
+	printf("Collection.\n");
+		break;
+	case 2:
+	printf("Remote.\n");
+		break;
+	} // End Power
+
+	printf("HM-1X -- Set Mode: \n\n");
+	printf("1. Transmission\n");
+	printf("2. Collection\n");
+	printf("3. Remote\n");
+
+	scanf("%s", char_choice);
+	int_choice = (atoi(char_choice)-1);
+
+	switch (int_choice)
+	{
+		case 0:
+			sprintf(mode_set_str, "AT+MODE0");
+			break; 
+		case 1:
+			sprintf(mode_set_str, "AT+MODE1");
+			break;
+		case 2:
+			sprintf(mode_set_str, "AT+MODE2");
+			break; 
+		default:printf("It's not in the mode, sir.");
+		    break;
+	}
+
+	// Apparently switch zeroes the variable.
+	int_choice = (atoi(char_choice)-1);
+	
+	// If we leave menu, don't write nuthin'.
+	if(int_choice < 3 && int_choice > -1)
+	{
+		bool changed_mode = false;
+		int count = 0;
+
+		while(!changed_mode && count < 5)
+		{
+			printf("Attempting to set mode.\n");
+			tx_data(mode_set_str, 9, PRINT, 0);
+			Sleep(100);
+			rx(NO_PARSE, NO_PRINT);
+			Sleep(120);
+			changed_mode = ok_check();
+			count++;
+		}
+		if (changed_mode)
+		{	
+			*local_mode = int_choice;
+		}
+		else
+		{
+			printf("Failed to change mode.\n");
+			Sleep(300);
+		}		
+	}
 }
 
 void set_power(int * local_power)

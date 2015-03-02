@@ -42,6 +42,8 @@ bool ping();
 void check_HM_10();
 void reset_hm1x();
 void set_name(char name[]);
+void set_role(int * role);
+void set_mode(int * mode);
 void set_power(int * local_power);
 
 // Print info.

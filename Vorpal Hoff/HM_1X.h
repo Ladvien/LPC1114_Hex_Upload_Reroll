@@ -32,7 +32,8 @@ void get_mode(int * local_mode);
 void get_role(int * role);
 void get_characteristics(char local_characteristics[]);
 void get_mac_address(char local_mac_address[]);
-int detect_hm1x_baud();
+void get_power(int * local_power);
+
 
 
 // HM-1X SET commands
@@ -41,6 +42,7 @@ bool ping();
 void check_HM_10();
 void reset_hm1x();
 void set_name(char name[]);
+void set_power(int * local_power);
 
 // Print info.
 void print_basic_info(char name[],
@@ -52,7 +54,12 @@ void print_basic_info(char name[],
 	int * mode, 
 	char last_response[],
 	char characteristics[],
-	char mac_address_str[]);
+	char mac_address_str[],
+	int * local_power);
+
+// Support functions.
+int detect_hm1x_baud();
+bool ok_check();
 
 // Clearing the RX buffer
 void clear_rx_buffer();

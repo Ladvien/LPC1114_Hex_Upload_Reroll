@@ -32,6 +32,7 @@ void HM_1X_main_menu()
 	char last_response[128];
 	char characteristics[5];
 	char mac_address_str[13];
+	int power = 0;
 
 	// Menu variables
 	char char_choice[3];
@@ -48,6 +49,7 @@ void HM_1X_main_menu()
 		get_mode(&mode);
 		get_characteristics(characteristics);
 		get_mac_address(mac_address_str);
+		get_power(&power);
 	}
 	
 	do
@@ -57,8 +59,8 @@ void HM_1X_main_menu()
 		printf("HM-1X -- Main Menu: \n\n");
 		printf("1. Get Basic Info\n");
 		printf("2. Set Baud\n");
-		printf("3. Set name\n");
-		//printf("4. \n");
+		printf("3. Set Name\n");
+		printf("4. Set Power Level\n");
 		printf("5. RSSI\n");
 		//printf("6. \n");
 		//printf("7. \n");
@@ -75,7 +77,8 @@ void HM_1X_main_menu()
 		&role, 
 		last_response,
 		characteristics,
-		mac_address_str);
+		mac_address_str,
+		&power);
 
 		scanf("%s", char_choice);
 		int_choice = atoi(char_choice);
@@ -95,8 +98,10 @@ void HM_1X_main_menu()
 				break;
 			case 3:
 				set_name(name);
-
 				break; 
+			case 4:
+				set_power(&power);
+				break;
 			case 5:
 				check_HM_10();
 			    break;
@@ -566,45 +571,49 @@ void set_name(char name[])
 {
 	char response[24];
 	char new_name[12];
-	char send_string[20];
+	char send_string[22];
 	int i = 0;
 
 	system("cls");
 	printf("\n");	
 	printf("Current HM-1X name: %s\n", name);
 	printf("HM-1X -- Set new name: \n\n");
+	printf("String must be 1-11 characters. Some spaces and symbols.\n");
 
-	send_string[0] = '\0';
-	int c;
-	while((c = getchar()) != EOF) 
-	    if (c == '\n') 
-	        break;
-	fgets(new_name, 12, stdin);
-	//scanf("%11", new_name);
-	//for (int i = 0; i < 11; ++i)
-	//{
-	//	if (new_name[i] == ' ')
-	//	{
-	//		new_name[i] = '_';
-	//	}
-	//}
-	sprintf(send_string, "AT+NAME%s", new_name);	
-	
-	response[0] = '\0';
-
-	// Get version info.
-	while(response[0] == '\0' && i < 3) // Did we ge anything?
+	// Thre is a bug here.  If you add an extra number (>11), then it'll overflow 
+	// into the entry of the next menu.  If I flush_stdin() after, then the user is
+	// prompted for input.  Sigh. It mostly works.
+	int end_of_string_i = 0;
+	while(end_of_string_i < 1 || end_of_string_i > 11)
 	{
-		tx_data(send_string, 11, PRINT, 0);
+		flush_stdin();
+		fgets(new_name, 12, stdin);
+		while(new_name[end_of_string_i] < 127 && new_name[end_of_string_i] > 31){end_of_string_i++;}
+		printf("HERE %i\n", end_of_string_i );
+	}
+	//flush_stdin();
+
+	sprintf(send_string, "AT+NAME%s", new_name);
+	for (int i = end_of_string_i+7; i < 18; ++i)
+	{
+		send_string[i]	= ' ';
+	}
+	send_string[18] = '\0';
+
+	response[0] = '\0';
+	while(ok_check() != 'K' && i < 3) // Did we ge anything?
+	{
+		
+		Sleep(1000);
+		printf("%s\n", send_string);
+		tx_chars(send_string, 19, PRINT, 0);
 		Sleep(100);
-		rx(NO_PARSE, PRINT);
+		rx(NO_PARSE, NO_PRINT);
 		// Max name is == 12 chars.
-		strncpy(response, RawRxBuffer, 24);
-		Sleep(100);
-		printf("%s\n", response);
 		Sleep(100);
 		i++;
 	}
+
 	if (i > 3)
 	{
 		printf("Failed to change name. Sure you're the dad?\n");
@@ -614,11 +623,120 @@ void set_name(char name[])
 	{
 		get_name(name);
 	}
-	//while((c = getchar()) != EOF) 
-    //if (c == '\n') 
-    //   break;
 }
 
+void get_power(int * local_power)
+{
+	char power_bfr[2];
+	int string_start = 7;
+	int i = 0;
+
+	power_bfr[0] = '\0';
+
+	while(power_bfr[0] == '\0' && i < 3) // Did we ge anything?
+	{
+		Sleep(100);
+		tx_data("AT+POWE?", sizeof("AT+POWE?"), NO_PRINT, 0);
+		Sleep(150);
+		rx(NO_PARSE, NO_PRINT);
+		strncpy(power_bfr, RawRxBuffer+string_start, 1);
+		Sleep(100);
+		printf("Device power: %s\n", power_bfr);
+		*local_power = atoi(power_bfr);
+		Sleep(100);
+		i++;
+	}
+	if (i > 3)
+	{
+		printf("Failed to get stop bit. Uh-oh.\n");
+		Sleep(1500);
+	}
+
+}
+
+void set_power(int * local_power)
+{
+	char power_set_str[8];
+	char char_choice[2];
+	int int_choice = 0;
+
+	system("cls");
+	printf("\n");	
+	printf("Current HM-1X Power Level: ");
+		switch(*local_power)
+		{
+		case 1:
+		printf("-23dbm\n");
+			break;
+		case 2:
+		printf("-6dbm\n");
+			break;
+		case 3:
+		printf("0dbm\n");
+			break;
+		case 4:
+		printf("6dbm\n");
+			break;
+		} // End Power
+
+	printf("HM-1X -- Set Power: \n\n");
+	printf("1. -23dbm\n");
+	printf("2. -6dbm\n");
+	printf("3. 0dbm\n");
+	printf("4. 6dbm\n");
+	printf("9. Return\n");
+
+	scanf("%s", char_choice);
+	int_choice = atoi(char_choice);
+
+	switch (int_choice)
+	{
+		case 1:
+			sprintf(power_set_str, "AT+POWE0");
+			break; 
+		case 2:
+			sprintf(power_set_str, "AT+POWE1");
+			break;
+		case 3:
+			sprintf(power_set_str, "AT+POWE2");
+			break; 
+		case 4:
+			sprintf(power_set_str, "AT+POWE3");
+			break;
+		default:printf("Um, that's not a power level, sir.");
+		    break;
+	}
+
+	// Apparently switch zeroes the variable.
+	int_choice = atoi(char_choice);
+	
+	// If we leave menu, don't write nuthin'.
+	if(int_choice < 5 && int_choice > 0)
+	{
+		bool changed_power = false;
+		int count = 0;
+
+		while(!changed_power && count < 5)
+		{
+			printf("Attempting to set power level.\n");
+			tx_data(power_set_str, 9, PRINT, 0);
+			Sleep(100);
+			rx(0, NO_PRINT);
+			Sleep(120);
+			changed_power = ok_check();
+			count++;
+		}
+		if (changed_power)
+		{	
+			*local_power = (int_choice-1);
+		}
+		else
+		{
+			printf("Failed to change power level.\n");
+			Sleep(300);
+		}		
+	}
+}
 
 int detect_hm1x_baud()
 {
@@ -642,7 +760,7 @@ int detect_hm1x_baud()
 		tx_data("AT", sizeof("AT"), NO_PRINT, 0);
 		Sleep(130);
 		rx(0, 0);
-		if (RawRxBuffer[0] == 'O' && RawRxBuffer[1] == 'K')
+		if (ok_check())
 		{
 			printf("%i\n", local_baud_lookup[i]);
 			current_hm_baud_rate = local_baud_lookup[i];
@@ -671,7 +789,7 @@ bool ping()
 	tx_data("AT", sizeof("AT"), NO_PRINT, 1);
 	Sleep(150);
 	rx(0, 0);
-	if (RawRxBuffer[0] == 'O' && RawRxBuffer[1] == 'K')
+	if (ok_check())
 	{
 		clear_rx_buffer();
 		return true;
@@ -739,6 +857,18 @@ void check_HM_10()
 	clearConsole();
 }
 
+bool ok_check()
+{
+	if (RawRxBuffer[0] == 'O' && RawRxBuffer[1] == 'K')
+	{
+		return true;
+	}
+	else{
+		return false;
+	}
+	return false;
+}
+
 void print_basic_info(char name[],
 	int * version,
 	int * baud_rate,
@@ -748,7 +878,8 @@ void print_basic_info(char name[],
 	int * role, 
 	char last_response[],
 	char characteristics[],
-	char mac_address_str[])
+	char mac_address_str[],
+	int * local_power)
 {
 	
 		if (*version > 0)
@@ -760,10 +891,10 @@ void print_basic_info(char name[],
 		switch(*role)
 		{
 		case 0:
-		printf("		Mode:            Peripheral\n");
+		printf("		Role:            Peripheral\n");
 			break;
 		case 1:
-		printf("		Mode:            Master\n");
+		printf("		Role:            Master\n");
 			break;
 		}
 		switch(*mode)
@@ -793,11 +924,29 @@ void print_basic_info(char name[],
 			}
 		}
 		printf("\n");
-		}
+
+
+		switch(*local_power)
+		{
+		case 0:
+		printf("		Power:           -23dbm\n");
+			break;
+		case 1:
+		printf("		Power:           -6dbm\n");
+			break;
+		case 2:
+		printf("		Power:           0dbm\n");
+			break;
+		case 3:
+		printf("		Power:           6dbm\n");
+			break;
+		} // End Power
+		} // End of main printout
 		else
 		{
 		printf("	 Auto-detected Baud: %i\n", *baud_rate);	
 		}
+
 }
 
 void clear_rx_buffer()
@@ -811,7 +960,5 @@ void clear_rx_buffer()
 void flush_stdin()
 {
 	int c;
-	while((c = getchar()) != EOF) 
-    if (c == '\n') 
-        break;
+	while ((c = getchar()) != '\n' && c != EOF);
 }

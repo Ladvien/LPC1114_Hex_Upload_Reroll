@@ -77,7 +77,7 @@ void main_menu()
 		printf("5. Program Chip\n");
 		printf("6. Erase LPC\n");
 		printf("7. Decode UUE debug file\n");
-		//printf("7. \n");
+		printf("8. Parse hex-file and write to debug.hex\n");
 		//printf("8. \n");
 		printf("9. Exit\n");
 
@@ -103,6 +103,9 @@ void main_menu()
 			    break;
 			case 6:
 			    break;
+			case 8:
+				debug_hex_file(file_name);
+			    break;
 			case 9:
 				shut_down();    
 			    break;
@@ -111,6 +114,57 @@ void main_menu()
 		}
 	}while(int_choice !=99);
 	
+}
+
+void debug_hex_file(char file_name[])
+{
+	FILE *hex_file;
+
+	// Stores file size.
+	int fileSize = 0;
+	int combined_address[2048];
+	struct Data data;
+	struct write write;
+	
+	debug = open_file ("debug.hex", "w" );
+	
+	// Local for FTDI State Machine.
+	//FTDI_state FTDI_Operation = RX_CLOSE;
+
+	//Open file using command-line info; for reading.
+	hex_file = open_file (file_name, "rb" );
+
+	// Sizes file to be used in data handling.
+	fileSize = file_sizer(hex_file);
+
+	// Load the data from file
+	data.HEX_array_size = hex_file_to_array(hex_file, data.HEX_array, fileSize);
+
+	int hex_index = 0;
+	int totalDataIndex = 0;
+
+	hexDataFile = open_file ("hexFile.hex", "w" );
+		if (hexDataFile == NULL) {
+		printf("I couldn't open hexFile.hex for writing.\n");
+		exit(0);
+	}
+
+	int line_index = 0;
+	while(hex_index < data.HEX_array_size)
+	{
+		for (int i = 0; i < 16; ++i && hex_index < data.HEX_array_size)
+		{
+			fprintf(hexDataFile, "%02X", data.HEX_array[hex_index]);
+			//printf("%02X", data.HEX_array[hex_index]);
+			hex_index++;
+		}
+		fprintf(hexDataFile, "  %i\n", combined_address[line_index]);
+		//printf("     %i\n", combined_address[line_index]);
+		line_index++;		
+	}
+
+	//printf("\n\n" );
+	shut_down();
 }
 
 void shut_down()
@@ -144,7 +198,7 @@ void program_chip(char file_name[])
 
 	struct Data data;
 	struct write write;
-	
+	int combined_address[2048];
 	debug = open_file ("debug.hex", "w" );
 	
 	// ISP uses RAM from 0x1000 017C to 0x1000 17F

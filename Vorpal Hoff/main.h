@@ -167,7 +167,7 @@ uint8_t tx_data(uint8_t string[], int txString_size, bool printOrNot, int freque
 void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int hexDataCharCount);
 void writeHexDataTofile(struct Data data_local);
 FILE *open_file ( uint8_t *file, uint8_t *mode );
-
+void debug_hex_file(char file_name[]);
 
 void OK();
 void Failed();

@@ -42,6 +42,7 @@
 int file_sizer(FILE *file_to_size);
 
 // Data Handling
+//int hex_file_to_array(FILE * file, uint8_t * hex_data, int hex_array_size, int combined_address[]);
 int hex_file_to_array(FILE * file, uint8_t * hex_data, int hex_array_size);
 
 // Makes an array mutiple of four; padding with 0xFF.
@@ -73,5 +74,10 @@ int tx_size_unsigned(uint8_t * string);
 
 // Get the size of a signed array.
 int tx_size_signed(char * string);
+
+// TEST
+bool read_line_from_hex_file(FILE * file, uint8_t line_of_data[], int * combined_address, int * total_chars_read);
+int hex_file_line_count(FILE * file_to_count);
+
 
 #endif /* DATA */

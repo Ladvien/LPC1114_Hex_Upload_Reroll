@@ -43,16 +43,133 @@ void decode_three(uint8_t * ret, char c0, char c1, char c2, char c3)
 // Data Handling
 int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 {
+	// 1. Get line count.
+	// 2. Read a line. From ':' to '\n'
+	// 3. Parse a line. 
+	//   Repeat for all lines.
+
+	int total_chars_read = 0;
+
+	// Data per line.
+	uint8_t line_of_data[32];
+	int combined_address[4096];
+
+	// Indexes
+	int hex_line_index = 0;
+	// Line dimesions
+	int chars_this_line = 0;
+
+	// How many lines in the hexfile?
+	int hex_lines_in_file = 0;
+
+	int counter = 0;
+
+	hex_lines_in_file = hex_file_line_count(file);
+
+	int line_index = 0;
+	while(line_index < hex_lines_in_file)
+	{
+		read_line_from_hex_file(file, line_of_data, &combined_address[line_index], &total_chars_read);
+		
+		printf("Line#: %i\n", line_index+1);
+		while(line_of_data[counter] != '\n')
+		{
+			printf("%i: %02X ", counter, line_of_data[counter]);
+			line_of_data[counter] = '\0';
+			counter++;
+		}
+
+		counter = 0;
+		printf("\n");
+		line_index++;
+	}
+
+	printf("Lines: %i\n", hex_lines_in_file);
+
+
+	return total_chars_read;
+} // End hex_file_to_array
+
+bool read_line_from_hex_file(FILE * file, uint8_t line_of_data[], int * combined_address, int * total_chars_read)
+{
+		uint8_t char_to_put;
+		int data_index = 0;
+
+		//To hold file hex values.
+		uint8_t byte_count;
+		uint8_t datum_address1;
+		uint8_t datum_address2;
+		uint8_t datum_record_type;
+		uint8_t datum_check_sum;
+
+		//BYTE COUNT
+		byte_count = read_byte_from_file(file, &char_to_put, total_chars_read);
+
+		// No need to read, if no data.
+		//if (byte_count == 0){return false;}
+		//printf("byte_count %02x\n", byte_count);
+		//ADDRESS1 //Will create an 8 bit shift. --Bdk6's
+		datum_address1 = read_byte_from_file(file, &char_to_put, total_chars_read);
+		//printf("datum_address1 %02x\n", datum_address1);
+		//ADDRESS2
+		datum_address2 = read_byte_from_file(file, &char_to_put, total_chars_read);
+		//printf("datum_address2 %02x\n", datum_address2);
+		//RECORD TYPE
+		datum_record_type = read_byte_from_file(file, &char_to_put, total_chars_read);		
+		//printf("record type %02x\n", datum_record_type);
+		
+		// No need to read, if not data.
+		//if (datum_record_type != 0){return false;}
+
+		// Replace with bitmasks.
+		*combined_address = datum_address1;
+		*combined_address <<= 8;
+		*combined_address |= datum_address2;
+		*combined_address =  *combined_address/16;
+		
+		// DATA
+		while(data_index < byte_count)
+		{
+
+			line_of_data[data_index] = read_byte_from_file(file, &char_to_put, total_chars_read);
+			//printf("data %02x \n", line_of_data[data_index]);
+			data_index++;
+		}			
+	
+		datum_check_sum = read_byte_from_file(file, &char_to_put, total_chars_read);
+
+		// Make line of data string.
+		line_of_data[data_index] = '\n';
+		return true;
+}
+
+
+int hex_file_line_count(FILE * file_to_count)
+{
+	int line_count = 0;
+	char got_char;
+
+	while(got_char != EOF)
+	{
+		got_char = fgetc(file_to_count);
+		if (got_char == ':'){line_count++;}
+	}
+	rewind(file_to_count);
+	return line_count;
+}
+
+// Data Handling
+int hex_file_to_array2(FILE * file, uint8_t * hex_data, int file_size, int combined_address[])
+{
 	//Total bytesRead.
-	int totalCharsRead = 0;
+	int total_chars_read = 0;
 	//Reading characters from a file.
-	uint8_t charToPut;
+	uint8_t char_to_put;
 
 	//To hold file hex values.
 	uint8_t fhex_byte_count[MAX_SIZE_16];
 	uint8_t fhex_address1[MAX_SIZE_16];
 	uint8_t fhex_address2[MAX_SIZE_16];
-	int combined_address = 0;
 	uint8_t fhex_record_type[MAX_SIZE_16];
 	uint8_t fhex_check_sum[MAX_SIZE_16];
 
@@ -66,26 +183,27 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 	int chars_this_line = 0;
 
 	//Loop through each character until EOF.
-	while(totalCharsRead  < file_size){
+	while(total_chars_read  < file_size){
 		
 		//BYTE COUNT
-		fhex_byte_count[file_char_index] = read_byte_from_file(file, &charToPut, &totalCharsRead);
+		fhex_byte_count[file_char_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);
 		
 		//ADDRESS1 //Will create an 8 bit shift. --Bdk6's
-		fhex_address1[file_char_index] = read_byte_from_file(file, &charToPut, &totalCharsRead);
+		fhex_address1[file_char_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);
 		
 		//ADDRESS2
-		fhex_address2[file_char_index] = read_byte_from_file(file, &charToPut, &totalCharsRead);
+		fhex_address2[file_char_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);
 		
 		//RECORD TYPE
-		fhex_record_type[file_char_index] = read_byte_from_file(file, &charToPut, &totalCharsRead);	
+		fhex_record_type[file_char_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);	
 
 		if (fhex_record_type[file_char_index] == 0)
 		{
-			combined_address = fhex_address1[file_char_index];
-			combined_address <<= 8;
-			combined_address |= fhex_address2[file_char_index];
-			combined_address =  combined_address/16;
+			combined_address[hex_line_index] = fhex_address1[file_char_index];
+			combined_address[hex_line_index] <<= 8;
+			combined_address[hex_line_index] |= fhex_address2[file_char_index];
+			combined_address[hex_line_index] =  combined_address[hex_line_index]/16;
+
 		}
 		
 		//Throws the byte count (data bytes in this line) into an integer.
@@ -95,23 +213,25 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 		// We only want data. Discard other data types.
 		if (fhex_record_type[file_char_index] == 0)
 		{
-			while (hex_data_index < chars_this_line && totalCharsRead < file_size && chars_this_line != 0x00)
+			while (hex_data_index < chars_this_line && total_chars_read < file_size && chars_this_line != 0x00)
 			{
 				//Store the completed hex value in the char array.
-				hex_data[hex_data_count] = read_byte_from_file(file, &charToPut, &totalCharsRead);
-				
+				hex_data[hex_data_count] = read_byte_from_file(file, &char_to_put, &total_chars_read);
+				printf("%i ", hex_data_count+combined_address[hex_line_index]);
+				printf("    %i  %i   %i   %i   %i\n", combined_address[hex_line_index], hex_data_count, hex_data_index, chars_this_line, file_char_index );
 				//Index for data.
 				hex_data_count++;	
 				hex_data_index++;			
 			}
-
+			//hex_data_count--;
+			printf("\n");
 		//Reset loop index for characters on this line.
 		hex_data_index = 0;
 		}
 		
 		//////// CHECK SUM //////////////
-		if (charToPut != 0xFF){
-			fhex_check_sum[file_char_index] = read_byte_from_file(file, &charToPut, &totalCharsRead);
+		if (char_to_put != 0xFF){
+			fhex_check_sum[file_char_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);
 		}
 
 		hex_line_index++;
@@ -121,38 +241,36 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 
 } // End hex_file_to_array
 
-uint8_t read_byte_from_file(FILE * file, uint8_t * charToPut, int * totalCharsRead)
+
+
+uint8_t read_byte_from_file(FILE * file, uint8_t * char_to_put, int * total_chars_read)
 {
 	//Holds combined nibbles.
-	char ASCII_hexvalue[3];
-	char hex_hexvalue;
-	char * pEnd;
-
+	uint8_t hexValue;
+	//Get first nibble.
+	*char_to_put = fgetc (file);
+	clear_special_char(file, char_to_put, total_chars_read);
 	//Put first nibble in.
-	*charToPut = fgetc (file);
-	clear_special_char(file, charToPut, totalCharsRead);
-	ASCII_hexvalue[0] = (uint8_t)*charToPut;
-	
+	hexValue = (Ascii2Hex(*char_to_put));
+	//Slide the nibble.
+	hexValue = ((hexValue << 4) & 0xF0);
 	//Put second nibble in.
-	*charToPut = fgetc (file);
-	clear_special_char(file, charToPut, totalCharsRead);
-	ASCII_hexvalue[1] = (uint8_t)*charToPut;
+	*char_to_put = fgetc (file);
+	clear_special_char(file, char_to_put, total_chars_read);
+	//Put the nibbles together.
+	hexValue |= (Ascii2Hex(*char_to_put));
+	//Return the byte.
+	*total_chars_read += 2;
 
-	// Increase counter for total characters read from file.
-	*totalCharsRead+=2;
-
-	// Convert the hex string to base 16.
-	hex_hexvalue = strtol(ASCII_hexvalue, &pEnd, 16);
-	
-	return hex_hexvalue;	
+	return hexValue;
 }
 
-void clear_special_char(FILE * file, uint8_t * charToPut, int * totalCharsRead)
+void clear_special_char(FILE * file, uint8_t * char_to_put, int * total_chars_read)
 {
 	//Removes CR, LF, ':'  --Bdk6's
-	while (*charToPut == '\n' || *charToPut == '\r' || *charToPut ==':'){
-		(*charToPut = fgetc (file));
-		*totalCharsRead++;
+	while (*char_to_put == '\n' || *char_to_put == '\r' || *char_to_put ==':'){
+		(*char_to_put = fgetc (file));
+		*total_chars_read++;
 	}
 }
 
@@ -171,7 +289,7 @@ uint8_t Ascii2Hex(uint8_t c)
 	{
         return (uint8_t)(c - 'A' + 10);
 	}
-	//printf("\n !!! Bad Character: %02X in file at totalCharsRead=%d !!!\n\n", c, totalCharsRead);
+	//printf("\n !!! Bad Character: %02X in file at total_chars_read=%d !!!\n\n", c, total_chars_read);
 	return 0;  // this "return" will never be reached, but some compilers give a warning if it is not present
 }
 

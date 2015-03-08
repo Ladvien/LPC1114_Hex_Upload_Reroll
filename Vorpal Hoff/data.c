@@ -41,7 +41,7 @@ void decode_three(uint8_t * ret, char c0, char c1, char c2, char c3)
 }
 
 // Data Handling
-int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
+int hex_file_to_array(FILE * file, uint8_t hex_data[], int file_size)
 {
 	// 1. Get line count.
 	// 2. Read a line. From ':' to '\n'
@@ -62,35 +62,54 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 	// How many lines in the hexfile?
 	int hex_lines_in_file = 0;
 
-	
 	int bytes_this_line[4096];
 
 	hex_lines_in_file = hex_file_line_count(file);
 
 	int line_index = 0;
 	int byte_index = 0;
+
 	while(line_index < hex_lines_in_file)
 	{
 		read_line_from_hex_file(file, line_of_data, &combined_address[line_index], &bytes_this_line[line_index]);
 		
-		printf("Line#: %i ", line_index+1);
-		printf("bytes#: %i ", bytes_this_line[line_index]);
-		printf("Addr: %i ", combined_address[line_index]);
+		//printf("Line#: %i ", line_index+1);
+		//printf("bytes#: %i ", bytes_this_line[line_index]);
+		//printf("Addr: %i ", combined_address[line_index]);
 		while(byte_index < bytes_this_line[line_index])
 		{
-			printf("%02X ", line_of_data[byte_index]);
+			hex_data[combined_address[line_index] + byte_index] = line_of_data[byte_index];
 			line_of_data[byte_index] = '\0';
 			byte_index++;
 		}
 
 		byte_index = 0;
-		printf("\n");
+		//printf("\n");
 		line_index++;
 	}
 
 	printf("Lines: %i\n", hex_lines_in_file);
+	
+	int k = 0;
+	int j = 0;
+	int printed_bytes = 0;
+	while (k < hex_lines_in_file)
+	{
+		//printf("k: %i, %i\n", k, hex_lines_in_file );
+		//printf("%i\n", bytes_this_line[k]);
 
-
+		while(j < bytes_this_line[k])
+		{
+			//printf("j: %i, %i\n", j, bytes_this_line[k] );
+			printf("%02X ", hex_data[j+(printed_bytes)]);
+			j++;
+		}
+		printed_bytes += bytes_this_line[k];
+		j=0;
+		printf("\n");
+		k++;
+	}
+	
 	return total_chars_read;
 } // End hex_file_to_array
 
@@ -127,12 +146,6 @@ bool read_line_from_hex_file(FILE * file, uint8_t line_of_data[], long int * com
 
 		*combined_address = ((uint16_t)datum_address1 << 8) | datum_address2;
 
-		// Replace with bitmasks.
-		//*combined_address = datum_address1;
-		//*combined_address <<= 8;
-		//*combined_address |= datum_address2;
-		//*combined_address =  *combined_address/16;
-		
 		// DATA
 		while(data_index < byte_count)
 		{

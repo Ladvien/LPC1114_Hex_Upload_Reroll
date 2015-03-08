@@ -47,7 +47,6 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[], int file_size)
 	// 2. Read a line. From ':' to '\n'
 	// 3. Parse a line. 
 	//   Repeat for all lines.
-
 	int total_chars_read = 0;
 
 	// Data per line.
@@ -61,17 +60,17 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[], int file_size)
 
 	// How many lines in the hexfile?
 	int hex_lines_in_file = 0;
-
 	int bytes_this_line[4096];
 
 	hex_lines_in_file = hex_file_line_count(file);
 
 	int line_index = 0;
 	int byte_index = 0;
-	bool what = true;
+	bool read_line_ok = false;
+	
 	while(line_index < hex_lines_in_file)
 	{
-		what = read_line_from_hex_file(file, line_of_data, &combined_address[line_index], &bytes_this_line[line_index]);
+		read_line_ok = read_line_from_hex_file(file, line_of_data, &combined_address[line_index], &bytes_this_line[line_index]);
 		if (!what)
 		{
 			printf("Line#: %i. Dude, that's not data!\n", line_index);

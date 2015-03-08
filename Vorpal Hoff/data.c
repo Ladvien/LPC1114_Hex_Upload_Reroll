@@ -41,7 +41,7 @@ void decode_three(uint8_t * ret, char c0, char c1, char c2, char c3)
 }
 
 // Data Handling
-int hex_file_to_array(FILE * file, uint8_t hex_data[], int file_size)
+int hex_file_to_array(FILE * file, uint8_t hex_data[])
 {
 	// 1. Get line count.
 	// 2. Read a line. From ':' to '\n'

@@ -43,7 +43,7 @@ int file_sizer(FILE *file_to_size);
 
 // Data Handling
 //int hex_file_to_array(FILE * file, uint8_t * hex_data, int hex_array_size, int combined_address[]);
-int hex_file_to_array(FILE * file, uint8_t hex_data[], int hex_array_size);
+int hex_file_to_array(FILE * file, uint8_t hex_data[]);
 
 // Makes an array mutiple of four; padding with 0xFF.
 int make_array_multiple_of_four(uint8_t * hex_data, int hex_array_size);

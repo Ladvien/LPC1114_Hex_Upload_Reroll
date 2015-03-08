@@ -138,7 +138,7 @@ void debug_hex_file(char file_name[])
 	fileSize = file_sizer(hex_file);
 
 	// Load the data from file
-	data.HEX_array_size = hex_file_to_array(hex_file, data.HEX_array, fileSize);
+	data.HEX_array_size = hex_file_to_array(hex_file, data.HEX_array);
 
 	int hex_index = 0;
 	int totalDataIndex = 0;
@@ -214,7 +214,7 @@ void program_chip(char file_name[])
 	fileSize = file_sizer(hex_file);
 
 	// Load the data from file
-	data.HEX_array_size = hex_file_to_array(hex_file, data.HEX_array, fileSize);
+	data.HEX_array_size = hex_file_to_array(hex_file, data.HEX_array);
 	data.HEX_array_size = make_array_multiple_of_four(data.HEX_array, data.HEX_array_size);
 	write.sectors_needed = sectors_needed(data.HEX_array_size);
 

@@ -68,39 +68,33 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[], int file_size)
 
 	int line_index = 0;
 	int byte_index = 0;
-
+	bool what = true;
 	while(line_index < hex_lines_in_file)
 	{
-		read_line_from_hex_file(file, line_of_data, &combined_address[line_index], &bytes_this_line[line_index]);
-		
-		//printf("Line#: %i ", line_index+1);
-		//printf("bytes#: %i ", bytes_this_line[line_index]);
-		//printf("Addr: %i ", combined_address[line_index]);
+		what = read_line_from_hex_file(file, line_of_data, &combined_address[line_index], &bytes_this_line[line_index]);
+		if (!what)
+		{
+			printf("Line#: %i. Dude, that's not data!\n", line_index);
+
+			what = true;
+		}
 		while(byte_index < bytes_this_line[line_index])
 		{
 			hex_data[combined_address[line_index] + byte_index] = line_of_data[byte_index];
 			line_of_data[byte_index] = '\0';
 			byte_index++;
 		}
-
 		byte_index = 0;
-		//printf("\n");
 		line_index++;
 	}
 
-	printf("Lines: %i\n", hex_lines_in_file);
-	
 	int k = 0;
 	int j = 0;
 	int printed_bytes = 0;
 	while (k < hex_lines_in_file)
 	{
-		//printf("k: %i, %i\n", k, hex_lines_in_file );
-		//printf("%i\n", bytes_this_line[k]);
-
 		while(j < bytes_this_line[k])
 		{
-			//printf("j: %i, %i\n", j, bytes_this_line[k] );
 			printf("%02X ", hex_data[j+(printed_bytes)]);
 			j++;
 		}
@@ -160,7 +154,6 @@ bool read_line_from_hex_file(FILE * file, uint8_t line_of_data[], long int * com
 		return true;
 }
 
-
 int hex_file_line_count(FILE * file_to_count)
 {
 	int line_count = 0;
@@ -174,89 +167,6 @@ int hex_file_line_count(FILE * file_to_count)
 	rewind(file_to_count);
 	return line_count;
 }
-
-// Data Handling
-int hex_file_to_array2(FILE * file, uint8_t * hex_data, int file_size, int combined_address[])
-{
-	//Total bytesRead.
-	int total_chars_read = 0;
-	//Reading characters from a file.
-	uint8_t char_to_put;
-
-	//To hold file hex values.
-	uint8_t fhex_byte_count[MAX_SIZE_16];
-	uint8_t fhex_address1[MAX_SIZE_16];
-	uint8_t fhex_address2[MAX_SIZE_16];
-	uint8_t fhex_record_type[MAX_SIZE_16];
-	uint8_t fhex_check_sum[MAX_SIZE_16];
-
-	//To count through all characters in the file.
-	int file_char_index = 0;
-	int hex_data_index = 0;
-	int hex_line_index = 0;
-	int hex_data_count = 0;
-	
-	//Holds line count.	
-	int chars_this_line = 0;
-
-	//Loop through each character until EOF.
-	while(total_chars_read  < file_size){
-		
-		//BYTE COUNT
-		fhex_byte_count[file_char_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);
-		
-		//ADDRESS1 //Will create an 8 bit shift. --Bdk6's
-		fhex_address1[file_char_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);
-		
-		//ADDRESS2
-		fhex_address2[file_char_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);
-		
-		//RECORD TYPE
-		fhex_record_type[file_char_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);	
-
-		if (fhex_record_type[file_char_index] == 0)
-		{
-			combined_address[hex_line_index] = fhex_address1[file_char_index];
-			combined_address[hex_line_index] <<= 8;
-			combined_address[hex_line_index] |= fhex_address2[file_char_index];
-			combined_address[hex_line_index] =  combined_address[hex_line_index]/16;
-
-		}
-		
-		//Throws the byte count (data bytes in this line) into an integer.
-		chars_this_line = fhex_byte_count[file_char_index];
-
-		//////// DATA ///////////////////
-		// We only want data. Discard other data types.
-		if (fhex_record_type[file_char_index] == 0)
-		{
-			while (hex_data_index < chars_this_line && total_chars_read < file_size && chars_this_line != 0x00)
-			{
-				//Store the completed hex value in the char array.
-				hex_data[hex_data_count] = read_byte_from_file(file, &char_to_put, &total_chars_read);
-				printf("%i ", hex_data_count+combined_address[hex_line_index]);
-				printf("    %i  %i   %i   %i   %i\n", combined_address[hex_line_index], hex_data_count, hex_data_index, chars_this_line, file_char_index );
-				//Index for data.
-				hex_data_count++;	
-				hex_data_index++;			
-			}
-			//hex_data_count--;
-			printf("\n");
-		//Reset loop index for characters on this line.
-		hex_data_index = 0;
-		}
-		
-		//////// CHECK SUM //////////////
-		if (char_to_put != 0xFF){
-			fhex_check_sum[file_char_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);
-		}
-
-		hex_line_index++;
-		file_char_index++;
-	}
-	return hex_data_count;
-
-} // End hex_file_to_array
 
 
 

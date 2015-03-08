@@ -52,7 +52,7 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 
 	// Data per line.
 	uint8_t line_of_data[32];
-	int combined_address[4096];
+	long int combined_address[4096];
 
 	// Indexes
 	int hex_line_index = 0;
@@ -62,24 +62,28 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 	// How many lines in the hexfile?
 	int hex_lines_in_file = 0;
 
-	int counter = 0;
+	
+	int bytes_this_line[4096];
 
 	hex_lines_in_file = hex_file_line_count(file);
 
 	int line_index = 0;
+	int byte_index = 0;
 	while(line_index < hex_lines_in_file)
 	{
-		read_line_from_hex_file(file, line_of_data, &combined_address[line_index], &total_chars_read);
+		read_line_from_hex_file(file, line_of_data, &combined_address[line_index], &bytes_this_line[line_index]);
 		
-		printf("Line#: %i\n", line_index+1);
-		while(line_of_data[counter] != '\n')
+		printf("Line#: %i ", line_index+1);
+		printf("bytes#: %i ", bytes_this_line[line_index]);
+		printf("Addr: %i ", combined_address[line_index]);
+		while(byte_index < bytes_this_line[line_index])
 		{
-			printf("%i: %02X ", counter, line_of_data[counter]);
-			line_of_data[counter] = '\0';
-			counter++;
+			printf("%02X ", line_of_data[byte_index]);
+			line_of_data[byte_index] = '\0';
+			byte_index++;
 		}
 
-		counter = 0;
+		byte_index = 0;
 		printf("\n");
 		line_index++;
 	}
@@ -90,10 +94,11 @@ int hex_file_to_array(FILE * file, uint8_t * hex_data, int file_size)
 	return total_chars_read;
 } // End hex_file_to_array
 
-bool read_line_from_hex_file(FILE * file, uint8_t line_of_data[], int * combined_address, int * total_chars_read)
+bool read_line_from_hex_file(FILE * file, uint8_t line_of_data[], long int * combined_address, int * bytes_this_line)
 {
-		uint8_t char_to_put;
 		int data_index = 0;
+		uint8_t char_to_put;
+		int total_chars_read = 0;
 
 		//To hold file hex values.
 		uint8_t byte_count;
@@ -103,43 +108,42 @@ bool read_line_from_hex_file(FILE * file, uint8_t line_of_data[], int * combined
 		uint8_t datum_check_sum;
 
 		//BYTE COUNT
-		byte_count = read_byte_from_file(file, &char_to_put, total_chars_read);
+		byte_count = read_byte_from_file(file, &char_to_put, &total_chars_read);
 
 		// No need to read, if no data.
-		//if (byte_count == 0){return false;}
-		//printf("byte_count %02x\n", byte_count);
+		if (byte_count == 0){return false;}
+
 		//ADDRESS1 //Will create an 8 bit shift. --Bdk6's
-		datum_address1 = read_byte_from_file(file, &char_to_put, total_chars_read);
-		//printf("datum_address1 %02x\n", datum_address1);
+		datum_address1 = read_byte_from_file(file, &char_to_put, &total_chars_read);
+
 		//ADDRESS2
-		datum_address2 = read_byte_from_file(file, &char_to_put, total_chars_read);
-		//printf("datum_address2 %02x\n", datum_address2);
+		datum_address2 = read_byte_from_file(file, &char_to_put, &total_chars_read);
+
 		//RECORD TYPE
-		datum_record_type = read_byte_from_file(file, &char_to_put, total_chars_read);		
-		//printf("record type %02x\n", datum_record_type);
-		
+		datum_record_type = read_byte_from_file(file, &char_to_put, &total_chars_read);		
+
 		// No need to read, if not data.
-		//if (datum_record_type != 0){return false;}
+		if (datum_record_type != 0){return false;}
+
+		*combined_address = ((uint16_t)datum_address1 << 8) | datum_address2;
 
 		// Replace with bitmasks.
-		*combined_address = datum_address1;
-		*combined_address <<= 8;
-		*combined_address |= datum_address2;
-		*combined_address =  *combined_address/16;
+		//*combined_address = datum_address1;
+		//*combined_address <<= 8;
+		//*combined_address |= datum_address2;
+		//*combined_address =  *combined_address/16;
 		
 		// DATA
 		while(data_index < byte_count)
 		{
-
-			line_of_data[data_index] = read_byte_from_file(file, &char_to_put, total_chars_read);
-			//printf("data %02x \n", line_of_data[data_index]);
+			line_of_data[data_index] = read_byte_from_file(file, &char_to_put, &total_chars_read);
 			data_index++;
 		}			
-	
-		datum_check_sum = read_byte_from_file(file, &char_to_put, total_chars_read);
+		*bytes_this_line = data_index;
 
-		// Make line of data string.
-		line_of_data[data_index] = '\n';
+		// CHECKSUM
+		datum_check_sum = read_byte_from_file(file, &char_to_put, &total_chars_read);
+
 		return true;
 }
 

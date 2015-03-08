@@ -76,7 +76,7 @@ int tx_size_unsigned(uint8_t * string);
 int tx_size_signed(char * string);
 
 // TEST
-bool read_line_from_hex_file(FILE * file, uint8_t line_of_data[], int * combined_address, int * total_chars_read);
+bool read_line_from_hex_file(FILE * file, uint8_t line_of_data[], long int * combined_address, int * bytes_this_line);
 int hex_file_line_count(FILE * file_to_count);
 
 

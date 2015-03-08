@@ -67,15 +67,14 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[], int file_size)
 	int line_index = 0;
 	int byte_index = 0;
 	bool read_line_ok = false;
-	
+
 	while(line_index < hex_lines_in_file)
 	{
 		read_line_ok = read_line_from_hex_file(file, line_of_data, &combined_address[line_index], &bytes_this_line[line_index]);
-		if (!what)
+		if (!read_line_ok)
 		{
 			printf("Line#: %i. Dude, that's not data!\n", line_index);
-
-			what = true;
+			read_line_ok = true;
 		}
 		while(byte_index < bytes_this_line[line_index])
 		{

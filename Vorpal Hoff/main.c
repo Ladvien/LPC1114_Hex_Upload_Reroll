@@ -125,7 +125,8 @@ void debug_hex_file(char file_name[])
 	int combined_address[2048];
 	struct Data data;
 	struct write write;
-	
+	uint8_t UUE_array[32768];
+
 	debug = open_file ("debug.hex", "w" );
 	
 	// Local for FTDI State Machine.
@@ -139,6 +140,22 @@ void debug_hex_file(char file_name[])
 
 	// Load the data from file
 	data.HEX_array_size = hex_file_to_array(hex_file, data.HEX_array);
+	
+	int UUE_array_size = 0;
+
+	UUE_array_size = UUEncode(UUE_array, data.HEX_array, data.HEX_array_size);
+
+ 	printf("\n\n");
+
+
+	int UUE_index = 0;
+
+	while(UUE_index < UUE_array_size)
+	{
+		printf("%c", UUE_array[UUE_index]);
+		UUE_index++;
+		
+	}
 
 	int hex_index = 0;
 	int totalDataIndex = 0;
@@ -162,6 +179,8 @@ void debug_hex_file(char file_name[])
 		//printf("     %i\n", combined_address[line_index]);
 		line_index++;		
 	}
+
+
 
 	//printf("\n\n" );
 	shut_down();

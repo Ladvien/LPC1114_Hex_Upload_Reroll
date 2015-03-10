@@ -67,6 +67,7 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[])
 	int line_index = 0;
 	int byte_index = 0;
 	bool read_line_ok = false;
+	int total_bytes_found = 0;
 
 	// Parse all lines in file.
 	while(line_index < hex_lines_in_file)
@@ -82,6 +83,7 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[])
 			hex_data[combined_address[line_index] + byte_index] = line_of_data[byte_index];
 			line_of_data[byte_index] = '\0';
 			byte_index++;
+			total_bytes_found++;
 		}
 		byte_index = 0;
 		line_index++;
@@ -93,6 +95,7 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[])
 	int printed_bytes = 0;
 	while (k < hex_lines_in_file)
 	{
+		printf("%i: ", k+1);
 		while(j < bytes_this_line[k])
 		{
 			printf("%02X ", hex_data[j+(printed_bytes)]);
@@ -104,7 +107,7 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[])
 		k++;
 	}
 	
-	return total_chars_read;
+	return total_bytes_found;
 } // End hex_file_to_array
 
 bool read_line_from_hex_file(FILE * file, uint8_t line_of_data[], long int * combined_address, int * bytes_this_line)
@@ -242,27 +245,22 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 	uint8_t byte_to_encode[3];
 	uint8_t uue_char[4];
 
-	int UUE_encoded_string_index = 0;
+	int UUEncoded_array_index = 0;
 	int uue_length_char_index = 45;
 	int padded_index = 0;
 	int bytes_left = 0;
 
-	for (int i = 0; i < hex_data_array_size; ++i)
-	{
-		//printf("%02X ", hex_data_array[i]);
-	}
-	
 	// 1. Add char for characters per line.
 	if(hex_data_array_size < 45)
 	{
-		 UUE_data_array[UUE_encoded_string_index] = ((hex_data_array_size << 2) >> 2) + ' ';
+		 UUE_data_array[UUEncoded_array_index] = ((hex_data_array_size << 2) >> 2) + ' ';
 	}
 	else
 	{
-		UUE_data_array[UUE_encoded_string_index] = 'M';
+		UUE_data_array[UUEncoded_array_index] = 'M';
 	}
 
-	UUE_encoded_string_index++;
+	UUEncoded_array_index++;
 
 	// Encode loop.
 	for (int hex_data_array_index = 0; hex_data_array_index < hex_data_array_size; hex_data_array_index)
@@ -296,14 +294,14 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 			// 5. Replace ' ' with '''
 			if (uue_char[i] == 0x00)
 			{
-				UUE_data_array[UUE_encoded_string_index] = 0x60;
+				UUE_data_array[UUEncoded_array_index] = 0x60;
 			}
 			else
 			{
-				UUE_data_array[UUE_encoded_string_index] = (uue_char[i] + ' ');
+				UUE_data_array[UUEncoded_array_index] = (uue_char[i] + ' ');
 			}
 
-			UUE_encoded_string_index++;
+			UUEncoded_array_index++;
 		}
 
 		// Data bytes left.
@@ -314,27 +312,27 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 			// NOTE: Could be simplified to include first char
 			// and additional characters, using a positive index.
 			// 1. Add char for characters per line.
-			UUE_data_array[UUE_encoded_string_index] = '\n';
-			UUE_encoded_string_index++;
+			UUE_data_array[UUEncoded_array_index] = '\n';
+			UUEncoded_array_index++;
 
 			if(bytes_left < 45)
 			{
 				// Find how many characters are left.
-				UUE_data_array[UUE_encoded_string_index] = ((bytes_left & 0x3f) + ' ');
+				UUE_data_array[UUEncoded_array_index] = ((bytes_left & 0x3f) + ' ');
 			}
 			else
 			{
-				UUE_data_array[UUE_encoded_string_index] = 'M';
+				UUE_data_array[UUEncoded_array_index] = 'M';
 			}	
-			UUE_encoded_string_index++;
+			UUEncoded_array_index++;
 			uue_length_char_index = 45;
 		}
 
 	} // End UUE loop	
-	UUE_data_array[UUE_encoded_string_index] = '\n';
+	UUE_data_array[UUEncoded_array_index] = '\n';
 
 	// Return count of UUE chars.
-	return UUE_encoded_string_index;
+	return UUEncoded_array_index;
 }
 
 int check_sum(uint8_t * hex_data_array, int hex_data_array_size)

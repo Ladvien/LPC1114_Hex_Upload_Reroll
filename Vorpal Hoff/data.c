@@ -253,7 +253,7 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 	// 1. Add char for characters per line.
 	if(hex_data_array_size < 45)
 	{
-		 UUE_data_array[UUEncoded_array_index] = ((hex_data_array_size << 2) >> 2) + ' ';
+		 UUE_data_array[UUEncoded_array_index] = ((hex_data_array_size & 0x3f) + ' ');
 	}
 	else
 	{

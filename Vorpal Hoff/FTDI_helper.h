@@ -58,9 +58,15 @@ void quick_connect();
 // Lists FTDI devices connected.
 bool get_device_list();
 bool connect_device(int * local_baud_rate);
-bool close_device(int * local_baud_rate);
+bool close_device();
 bool reset_device(int * local_baud_rate);
 bool set_baud_rate(int * local_baud_rate);
 bool set_baud_rate_auto(int * local_baud_rate);
+
+bool tx_data2(uint8_t data_array[], bool printOrNot);
+bool tx_string2(char string[], bool printOrNot, int frequency_of_tx_char);
+bool rx2(bool print_or_not);
+bool is_literal_f(const char *s, size_t l);
+
 
 #endif /* FTDI_helper.h */

@@ -30,43 +30,43 @@ int set_ISP_mode(int print)
 	{	
 		// "AT+PIO30"
 		tx_chars(HM_ISP_LOW, sizeof(HM_ISP_LOW), print, 0);
-		Sleep(100);
+		Sleep(200);
 		successful += rx(PARSE, print);
 		printf(".");
 
 		// "AT+PIO20"
 		tx_chars(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
-		Sleep(100);
+		Sleep(200);
 		successful += rx(PARSE, print);
 		printf(".");
 		
 		// "AT+PIO21"
 		tx_chars(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
-		Sleep(100);
+		Sleep(200);
 		successful += rx(PARSE, print);
 		printf(".");
 		
 		// Synchronized check.
 		tx_chars(LPC_CHECK, sizeof(LPC_CHECK), print, 0);
-		Sleep(100);
+		Sleep(200);
 		successful += rx(PARSE, print);
 		printf(".");
 
 		// Tell the LPC we are synchronized.
 		tx_chars(Synchronized, sizeof(Synchronized), print, 0);
-		Sleep(100);
+		Sleep(200);
 		successful += rx(PARSE, print);
 		printf(".");
 
 		// Set crystal
 		tx_chars("12000\n", sizeof("12000\n"), print, 0);
-		Sleep(100);
+		Sleep(200);
 		successful += rx(PARSE, print);
 		printf(".");
 
 		// Let's turn off ECHO.
 		tx_chars("A 0\n", sizeof("A 0\n"), print, 10);
-		Sleep(100);
+		Sleep(200);
 		rx(PARSE, print);		
 		printf(".");
 
@@ -112,23 +112,23 @@ int set_RUN_mode(int print)
 	{	
 		// "AT+PIO31"
 		tx_chars(HM_ISP_HIGH, sizeof(HM_ISP_HIGH), print, 0);
-		Sleep(100);
+		Sleep(300);
 		successful += rx(PARSE, print);
 		printf(".");
 
 		// "AT+PIO20"
 		tx_chars(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
-		Sleep(100);
+		Sleep(300);
 		successful += rx(PARSE, print);
 		printf(".");
 		
 		// "AT+PIO21"
 		tx_chars(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
-		Sleep(100);
+		Sleep(300);
 		successful += rx(PARSE, print);
 		printf(".");
 
-
+		Sleep(4000);
 		if (successful > 3)
 		{
 			OK();

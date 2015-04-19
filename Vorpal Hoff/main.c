@@ -75,10 +75,9 @@ void main_menu()
 		printf("3. Open HM-1X Menu\n");
 		printf("4. Connect LPC\n");
 		printf("5. Program Chip\n");
-		printf("6. Erase LPC\n");
+		//printf("6. Erase LPC\n");
 		printf("7. Decode UUE debug file\n");
 		printf("8. Parse hex-file and write to debug.hex\n");
-		//printf("8. \n");
 		printf("9. Exit\n");
 
 		scanf("%s", char_choice);
@@ -96,7 +95,7 @@ void main_menu()
 				HM_1X_main_menu();
 				break; 
 			case 4:
-
+				// Not yet used.
 				break;
 			case 5:
 				program_chip(file_name);
@@ -113,8 +112,10 @@ void main_menu()
 			    break;
 		}
 	}while(int_choice !=99);
-	
 }
+
+
+
 
 void debug_hex_file(char file_name[])
 {
@@ -126,6 +127,10 @@ void debug_hex_file(char file_name[])
 	struct Data data;
 	struct write write;
 	uint8_t UUE_array[32768];
+
+	// Array for decoded chunk.
+	uint8_t decoded_bytes[3];
+
 
 	debug = open_file ("debug.hex", "w" );
 	
@@ -144,6 +149,8 @@ void debug_hex_file(char file_name[])
 	int UUE_array_size = 0;
 
 	UUE_array_size = UUEncode(UUE_array, data.HEX_array, data.HEX_array_size);
+
+	writeStringToFile(UUE_array);
 
  	printf("\n\n");
 
@@ -179,8 +186,29 @@ void debug_hex_file(char file_name[])
 		//printf("     %i\n", combined_address[line_index]);
 		line_index++;		
 	}
+	printf("\n\n");
 
+	int bytes_this_line = 0;
+	int total_bytes = 0;
+	int bytes_counter = 0;
 
+	while(total_bytes < UUE_array_size){
+		bytes_this_line = (int)UUE_array[total_bytes]-32;
+		bytes_counter = 0;
+		//printf("%i     %i", bytes_this_line, bytes_counter);
+		//Sleep(1000);
+		while(bytes_counter < 62){
+			printf("%c", UUE_array[total_bytes]);
+			total_bytes++;
+			bytes_counter++;
+		}
+		//printf("\n");
+	}
+
+	printf("%i", UUE_array[0]-32);
+	printf("\n\n");
+	// %`^H
+	decode_three(decoded_bytes, '%','`','^','H');
 
 	//printf("\n\n" );
 	shut_down();
@@ -191,6 +219,7 @@ void shut_down()
 	fclose ( UUEDataFile );
 	fclose ( hexDataFile );
 	fclose ( debug );
+	fclose ( UUEDataFile );
 	clearConsole();
 	printf("\n\"Hot glue!!\" --Hoff70\n  1968 - 2015\n");
 	//printf("In memory of Johnathan Hoffman\n1968 - 2015\n");
@@ -200,32 +229,26 @@ void shut_down()
 
 void program_chip(char file_name[])
 {
+
 	timer();
 
-	//For setting state of DTR/CTS.
-	//uint8_t DTR_Switch;
-	//uint8_t CTS_Switch;
+	UUEDataFile = open_file ("uueFile.deb", "w" );
+	debug = open_file ("debug.hex", "w" );
+	
+	// File pointer.
 	FILE *hex_file;
+
 	// Holds the raw hex data, straight from the file.
 	uint8_t UUE_data_array[MAX_SIZE];
 
-	// Array for decoded chunk.
-	uint8_t decoded_bytes[3];
-
 	// Stores file size.
 	int fileSize = 0;
-
+	
 	struct Data data;
 	struct write write;
+
 	int combined_address[2048];
-	debug = open_file ("debug.hex", "w" );
 	
-	// ISP uses RAM from 0x1000 017C to 0x1000 17F
-	write.ram_address = 0x1000017C;
-
-	// Local for FTDI State Machine.
-	//FTDI_state FTDI_Operation = RX_CLOSE;
-
 	//Open file using command-line info; for reading.
 	hex_file = open_file (file_name, "rb" );
 
@@ -234,6 +257,12 @@ void program_chip(char file_name[])
 
 	// Load the data from file
 	data.HEX_array_size = hex_file_to_array(hex_file, data.HEX_array);
+	int byte_count = 28;
+	while(byte_count < 33){
+		printf("%02x ", data.HEX_array[byte_count]);
+		byte_count++;
+	}
+	Sleep(3000);
 	data.HEX_array_size = make_array_multiple_of_four(data.HEX_array, data.HEX_array_size);
 	write.sectors_needed = sectors_needed(data.HEX_array_size);
 
@@ -246,9 +275,6 @@ void program_chip(char file_name[])
 
 	// Write hex string back to a file.  Used for debugging.
 	writeHexDataTofile(data);
-
-	// %`^H
-	decode_three(decoded_bytes, '%','`','^','H');
 
 	// Let's wake the device chain (FTDI, HM-10, HM-10, LPC)
 	bool HM_1X_awake = ping();
@@ -303,13 +329,6 @@ void program_chip(char file_name[])
 	rx(PARSE, PRINT);
 
 	*/
-
-	//Close files.
-	fclose ( hex_file );
-	fclose ( UUEDataFile );
-	fclose ( hexDataFile );
-	fclose ( debug );
-	clearConsole();
 }
 
 ///////////// FTDI  //////////////////////////////////////////////////////////////////////////
@@ -317,6 +336,7 @@ void program_chip(char file_name[])
 
 uint8_t rx(bool parse, bool printOrNot)
 {	
+	printOrNot = true;
 	// 0 = unsuccessful, 1 = LPC, 2 = HM-10
 	int device_and_success = 0;
 	//FT_SetTimeouts(handle, timeout, 0);
@@ -499,6 +519,11 @@ uint8_t tx_data(uint8_t string[], int txString_size, bool printOrNot, int freque
 // Output files, for debugging purposes.
 ///////////// Debugging //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
+
+void writeStringToFile(char string[])
+{
+	fprintf(UUEDataFile, "%s", string);
+}
 
 void writeUUEDataTofile(uint8_t UUE_Encoded_String[], int UUE_Encoded_String_Index)
 {
@@ -728,6 +753,12 @@ struct write validity_checksum(struct write write_local, struct Data data_local)
 		validity_sum += word;
 	}
 
+	int byte_count = 28;
+	while(byte_count < 33){
+		printf("%02x ", data_local.HEX_array[byte_count]);
+		byte_count++;
+	}
+
 	printf("Validity sum: %"PRId32"\n", validity_sum);
 	
 	return write_local;
@@ -765,7 +796,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	float success_ratio = 0;
 
 	// ISP uses RAM from 0x1000 017C to 0x1000 17F
-	write_local.ram_address = 0x1000017C;
+	//write_local.ram_address = 0x10001019;
 
 	/////// CHUNK A ////////
 
@@ -783,11 +814,12 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 		// 3. Send intent-to-write string.
 		tx_chars(intent_to_write_to_ram_string, tx_size_signed(intent_to_write_to_ram_string), PRINT, 0);
 		tx_chars("\n", sizeof("\n"), NO_PRINT, 0);
-		Sleep(100);
+		Sleep(300);
 		rx(PARSE, PRINT);
 
 		// 4. Send chunk_A of data: "DATA\n"
 		tx_data(write_local.UUE_chunk_A, write_local.UUE_chunk_A_UUE_char_count, PRINT, slow_down);
+		writeStringToFile(write_local.UUE_chunk_A);
 		Sleep(300);	
 		tx_chars("\n", sizeof("\n"), NO_PRINT, 0);
 
@@ -840,19 +872,20 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 		// 3. Send intent-to-write string.
 		tx_chars(intent_to_write_to_ram_string, tx_size_signed(intent_to_write_to_ram_string), PRINT, 0);
 		tx_chars("\n", sizeof("\n"), NO_PRINT, 0);
-		Sleep(100);
+		Sleep(300);
 		rx(PARSE, PRINT);
 
 		// 4. Send chunk_A of data: "DATA\n"
 		tx_data(write_local.UUE_chunk_B, write_local.UUE_chunk_B_UUE_char_count, PRINT, slow_down);
-		Sleep(200);	
+		writeStringToFile(write_local.UUE_chunk_B);
+		Sleep(300);	
 		tx_chars("\n", sizeof("\n"), PRINT, 0);
 
 		// 5. Send checksum: "Chk_sum\n"
 		snprintf(checksum_as_string, 10, "%i\n", write_local.UUE_chunk_B_check_sum);
 		tx_chars(checksum_as_string, tx_size_signed(checksum_as_string), NO_PRINT, 0);
 		tx_chars("\n", sizeof("\n"), PRINT, 0);
-		Sleep(110);
+		Sleep(140);
 	
 		// 6. Read response from LPC.
 		successful = rx(PARSE, PRINT);

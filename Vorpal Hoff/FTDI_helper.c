@@ -6,9 +6,17 @@
 #include "FTDI_helper.h"
 #include "main.h"
 
+#define is_literal_(x) is_literal_f(#x, sizeof(#x) - 1)
+#define is_literal(x) is_literal_(x)
+
 FT_STATUS ftStatus;
 DWORD numDevs;
 
+extern DWORD EventDWord;
+extern DWORD TxBytes;
+extern DWORD BytesWritten;
+extern DWORD RxBytes;
+extern DWORD BytesReceived;
 extern FT_DEVICE_LIST_INFO_NODE *devInfo;
 extern bool FTDI_open_flag;
 
@@ -53,21 +61,7 @@ void ftdi_menu()
 
 		printf("9. Main Menu\n");
 
-		if (got_list == true && connect_device == false)
-		{
-			printf("\n");
-			printf("\n\nConnected FTDI:");
-			for (int i = 0; i < numDevs; i++) {
-				printf("\nDevice: %d:\n",i);
-				printf(" 	Flags:         0x%02X\n",devInfo[i].Flags);
-				printf(" 	Type:          0x%02X\n",devInfo[i].Type);
-				printf(" 	ID:            0x%02X\n",devInfo[i].ID);
-				printf(" 	Local ID:      0x%02X\n",devInfo[i].LocId);
-				printf(" 	Serial Number: %s\n",devInfo[i].SerialNumber);
-				printf(" 	Description:   %s\n",devInfo[i].Description);
-				printf(" 	ftHandle =     0x%02X\n",devInfo[i].ftHandle);
-			}
-		}
+		// If connected, display the connected device info.
 		if (connected_flag == true)
 		{
 			printf("\n");
@@ -79,7 +73,6 @@ void ftdi_menu()
 			printf(" 	Serial Number: %s\n",devInfo[connected_device_num].SerialNumber);
 			printf(" 	Description:   %s\n",devInfo[connected_device_num].Description);
 			printf(" 	ftHandle =     0x%02X\n",devInfo[connected_device_num].ftHandle);
-
 		}
 
 		// Get user choice.
@@ -142,12 +135,11 @@ void quick_connect()
 	(FT_DEVICE_LIST_INFO_NODE*)malloc(sizeof(FT_DEVICE_LIST_INFO_NODE)*numDevs);
 	FT_Open(0, &devInfo[0].ftHandle);
 	FT_SetBaudRate(devInfo[0].ftHandle, local_baud_rate);
-
 }
 	
 bool get_device_list()
 {
-	// Create the device information list
+	// Create the device information list.
 	ftStatus = FT_CreateDeviceInfoList(&numDevs);
 
 	if (ftStatus == FT_OK) {
@@ -157,19 +149,13 @@ bool get_device_list()
 		printf("Failed to get FTDI device list.\n");
 	}
 
-	// create the device information list
-	ftStatus = FT_CreateDeviceInfoList(&numDevs);
-	if (ftStatus == FT_OK) {
-		printf("Number of devices is %d\n",numDevs);
-	}
-
 	if (numDevs > 0) {
 		
-		// allocate storage for list based on numDevs
+		// Allocate storage for list based on numDevs.
 		devInfo =
 		(FT_DEVICE_LIST_INFO_NODE*)malloc(sizeof(FT_DEVICE_LIST_INFO_NODE)*numDevs);
 		
-		// get the device information list
+		// Get the device information list.
 		ftStatus = FT_GetDeviceInfoList(devInfo,&numDevs);
 		if (ftStatus == FT_OK) {
 				printf("Got Devices\n");
@@ -179,12 +165,9 @@ bool get_device_list()
 				printf("Failed to get device list.\n");
 				Sleep(3000);
 			}
+			// Set flag if we got at least on device.
+			return true;	
 		}
-	if (numDevs > 0)
-	{
-		// Set flag if we got at least on device.
-		return true;	
-	}
 	return false;
 }
 
@@ -248,11 +231,9 @@ bool connect_device(int * local_baud_rate)
 	return false;
 }
 
-bool close_device(int * local_baud_rate)
+bool close_device()
 {
 	FT_Close(devInfo[connected_device_num].ftHandle);
-
-	FT_SetBaudRate(devInfo[connected_device_num].ftHandle, *local_baud_rate);
 
 	if (FT_status != FT_OK)
 	{
@@ -363,4 +344,120 @@ bool set_baud_rate_auto(int * local_baud_rate)
 	 	return true;
 	 }
 	 return false;
+}
+
+bool tx_data2(uint8_t data_array[], bool print_or_not)
+{
+	bool FTWrite_Check;
+	int sizeof_string = 0;
+
+	bool literally;
+
+
+
+	// Let's count the characters in the string.
+	while(data_array[sizeof_string] != '\0')
+	{
+		sizeof_string++;
+	}
+	literally = is_literal_f(data_array, sizeof_string);
+	printf("Literal: %s\n", literally);
+
+	
+	// Let's write the string.
+	FTWrite_Check = FT_Write(devInfo[connected_device_num].ftHandle, data_array, (DWORD)sizeof_string, &BytesWritten);
+	
+	// If the write was not successful
+	if (FTWrite_Check != FT_OK) {printf("Bad write!\n");return false;}
+	
+	// If the print flag is set, let's print the string.
+	if(print_or_not)
+	{
+		printf("%s", data_array);
+	}
+
+	for (int i = 0; i < sizeof_string; ++i)
+	{
+		printf("Cleaning \n");
+		data_array[i] = '\0';
+	}
+	
+	printf("Blah %i %i\n", sizeof_string, BytesWritten);
+	// If all bytes of the string were written, let's return successful.
+	if (sizeof_string == BytesWritten)
+	{
+		return true;
+	}
+
+	// Shouldn't be reached, but just in case.
+	return false;
+}
+
+bool tx(char data[], int tx_data_size, bool print_or_not)
+{
+	uint8_t FTWrite_Check;
+	int char_tx_count = 0;
+
+	while(char_tx_count != tx_data_size)
+	{
+		//This should print just data (ie, no Start Code, Byte Count, Address, Record type, or Checksum).
+		FTWrite_Check = FT_Write(devInfo[connected_device_num].ftHandle, &data[char_tx_count], (DWORD)sizeof(data[char_tx_count]), &BytesWritten);
+		if (FTWrite_Check != FT_OK)
+		{
+			printf("Bad write!\n");
+		}
+		if(print_or_not)
+		{
+			printf("%C", data[char_tx_count]);
+		}
+		char_tx_count++;
+	}
+
+	if (char_tx_count == tx_data_size)
+	{
+		return true;
+	}
+	return false;
+}
+
+bool rx2(bool print_or_not)
+{
+	// We need to get the status to see if we have characters in buffer.
+	FT_GetStatus(devInfo[connected_device_num].ftHandle, &RxBytes, &TxBytes, &EventDWord);
+	// We turn the buffer into a string; this is for easy parsing.
+	RawRxBuffer[RxBytes+1] = '\0';
+	// We only want to read the FTDI if there are bytes to read.
+	if (RxBytes > 0) {
+		// Read the bytes.  They are stored in the RawRxBuffer, BytesReceived is how many bytes we got
+		// instead of how many bytes we should get.
+		FT_status = FT_Read(devInfo[connected_device_num].ftHandle,RawRxBuffer,RxBytes,&BytesReceived);
+		if (FT_status == FT_OK) {
+			if(print_or_not)
+			{
+				printf("%s\n", RawRxBuffer);
+			}
+			// Put code here to copy string out of function.
+			return true;
+		}
+		else {
+			printf("RX FAILED \n");
+			return false;
+		}
+	}
+	return false;
+}
+
+bool is_literal_f(const char *s, size_t l)
+{
+    const char *e = s + l;
+    if(s[0] == 'L') s++;
+    if(s[0] != '"') return false;
+    for(; s != e; s = strchr(s + 1, '"'))
+      {
+        if(s == NULL) return false;
+        s++;
+        while(isspace(*s)) s++;
+        if(*s != '"') return false;
+      }
+    return true;
 }

@@ -69,6 +69,12 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[])
 	bool read_line_ok = false;
 	int total_bytes_found = 0;
 
+	int data_count = 0;
+	while (data_count < 32768){
+		hex_data[data_count] = 0xFF;
+		data_count++;
+	}
+
 	// Parse all lines in file.
 	while(line_index < hex_lines_in_file)
 	{
@@ -96,7 +102,8 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[])
 	while (k < hex_lines_in_file)
 	{
 		printf("%i: ", k+1);
-		while(j < bytes_this_line[k])
+		//while(j < bytes_this_line[k])
+		while(j < 16)
 		{
 			printf("%02X ", hex_data[j+(printed_bytes)]);
 			j++;
@@ -331,7 +338,7 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 	} // End UUE loop	
 	UUE_data_array[UUEncoded_array_index] = '\n';
 
-	// Return count of UUE chars.
+	// 6. Return UUE data array (implicit) and size.
 	return UUEncoded_array_index;
 }
 

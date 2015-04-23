@@ -192,11 +192,19 @@ void debug_hex_file(char file_name[])
 	printf("\n\n");
 
 	// UUEDecode
-	// 0. Open the uueDebug.deb file.
-	// 1. Get a line from the file and put it into a string.
+	// 0. Open the uueFile.deb file.
+	// 1. Get a line from the file and put it into a string. (Need a read_UUE_line() function.)
 	// 2. Call decode_line() on the encoded string.
 	// 3. Add the returned char array to a larger character array; this will be the decoded data (in hex format).
-	// 4. Repeat 2-3 for all encoded lines in the UUE file.
+	// 4. Repeat 1-3 for all encoded lines in the UUE file.
+	// 5. Format hex data into HEX file format.
+
+	// 0. Open the uueFile.deb file.
+	hexDataFile = open_file ("uueFile.deb", "r" );
+
+	// Loop
+		// 1. Get a line from the file and put it into a string.
+
 
 	//printf("%i", UUE_array[0]-32);
 	//printf("\n\n");

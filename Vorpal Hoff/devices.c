@@ -23,7 +23,7 @@ int set_ISP_mode(int print)
 	// Test completeness of command.
 	int successful = 0;
 
-	printf("Starting LPC ISP.");
+	printf("Starting LPC ISP.\n");
 
 	// Let's attempt 3x to successfully set ISP mode
 	for (int i = 0; i < 5; ++i)
@@ -31,45 +31,91 @@ int set_ISP_mode(int print)
 		// "AT+PIO30"
 		tx_chars(HM_ISP_LOW, sizeof(HM_ISP_LOW), print, 0);
 		Sleep(200);
+		if(print != PRINT)
+		{
+			printf(".");
+		}
+		else{
+			printf(" ");
+		}
 		successful += rx(PARSE, print);
-		printf(".");
-
+		
 		// "AT+PIO20"
 		tx_chars(HM_LPC_RESET_LOW, sizeof(HM_LPC_RESET_LOW), print, 0);
 		Sleep(200);
+		if(print != PRINT)
+		{
+			printf(".");
+		}
+		else{
+			printf(" ");
+		}
 		successful += rx(PARSE, print);
-		printf(".");
-		
+
 		// "AT+PIO21"
 		tx_chars(HM_LPC_RESET_HIGH, sizeof(HM_LPC_RESET_HIGH), print, 0);
 		Sleep(200);
+		if(print != PRINT)
+		{
+			printf(".");
+		}
+		else{
+			printf(" ");
+		}
 		successful += rx(PARSE, print);
-		printf(".");
-		
+
 		// Synchronized check.
 		tx_chars(LPC_CHECK, sizeof(LPC_CHECK), print, 0);
 		Sleep(200);
+		if(print != PRINT)
+		{
+			printf(".");
+		}
+		else{
+			printf(" ");
+		}
 		successful += rx(PARSE, print);
-		printf(".");
-
+		
 		// Tell the LPC we are synchronized.
 		tx_chars(Synchronized, sizeof(Synchronized), print, 0);
 		Sleep(200);
+		if(print != PRINT)
+		{
+			printf(".");
+		}
+		else{
+			printf(" ");
+		}
 		successful += rx(PARSE, print);
-		printf(".");
 
 		// Set crystal
 		tx_chars("12000\n", sizeof("12000\n"), print, 0);
 		Sleep(200);
+		if(print != PRINT)
+		{
+			printf(".");
+		}
+		else{
+			printf(" ");
+		}
 		successful += rx(PARSE, print);
-		printf(".");
 
 		// Let's turn off ECHO.
 		tx_chars("A 0\n", sizeof("A 0\n"), print, 10);
 		Sleep(200);
+		if(print != PRINT)
+		{
+			printf(".");
+		}
+		else{
+			printf(" ");
+		}
 		rx(PARSE, print);		
-		printf(".");
-
+		
+		if (print == PRINT)
+		{
+			Sleep(10000);
+		}
 		// Set baud
 		//tx_chars("9600\n", sizeof("9600\n"), 0);
 		//Sleep(500);

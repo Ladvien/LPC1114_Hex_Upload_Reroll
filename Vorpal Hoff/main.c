@@ -101,6 +101,7 @@ void main_menu()
 				program_chip(file_name);
 			    break;
 			case 6:
+				set_ISP_mode(PRINT);
 			    break;
 			case 8:
 				debug_hex_file(file_name);
@@ -127,15 +128,21 @@ void debug_hex_file(char file_name[])
 	struct Data data;
 	struct write write;
 	uint8_t UUE_array[32768];
+	uint8_t decoded_UUE_array[32768];
 
 	// Array for decoded chunk.
 	uint8_t decoded_bytes[3];
 
 
 	debug = open_file ("debug.hex", "w" );
+	UUEDataFile = open_file ("uueFile.uue", "w" );
+	hexDataFile = open_file ("hexFile.hex", "w" );
 	
-	// Local for FTDI State Machine.
-	//FTDI_state FTDI_Operation = RX_CLOSE;
+	if (hexDataFile == NULL) {
+		printf("I couldn't open hexFile.hex for writing.\n");
+		exit(0);
+	}
+
 
 	//Open file using command-line info; for reading.
 	hex_file = open_file (file_name, "rb" );
@@ -167,13 +174,9 @@ void debug_hex_file(char file_name[])
 	int hex_index = 0;
 	int totalDataIndex = 0;
 
-	hexDataFile = open_file ("hexFile.hex", "w" );
-		if (hexDataFile == NULL) {
-		printf("I couldn't open hexFile.hex for writing.\n");
-		exit(0);
-	}
 
 	int line_index = 0;
+
 	while(hex_index < data.HEX_array_size)
 	{
 		for (int i = 0; i < 16; ++i && hex_index < data.HEX_array_size)
@@ -182,34 +185,53 @@ void debug_hex_file(char file_name[])
 			//printf("%02X", data.HEX_array[hex_index]);
 			hex_index++;
 		}
-		fprintf(hexDataFile, "  %i\n", combined_address[line_index]);
+		fprintf(hexDataFile, "  %04X\n", line_index*16);
 		//printf("     %i\n", combined_address[line_index]);
 		line_index++;		
 	}
 	printf("\n\n");
 
-	int bytes_this_line = 0;
-	int total_bytes = 0;
-	int bytes_counter = 0;
+	// UUEDecode
+	// 0. Open the uueDebug.deb file.
+	// 1. Get a line from the file and put it into a string.
+	// 2. Call decode_line() on the encoded string.
+	// 3. Add the returned char array to a larger character array; this will be the decoded data (in hex format).
+	// 4. Repeat 2-3 for all encoded lines in the UUE file.
 
-	while(total_bytes < UUE_array_size){
-		bytes_this_line = (int)UUE_array[total_bytes]-32;
-		bytes_counter = 0;
-		//printf("%i     %i", bytes_this_line, bytes_counter);
-		//Sleep(1000);
-		while(bytes_counter < 62){
-			printf("%c", UUE_array[total_bytes]);
-			total_bytes++;
-			bytes_counter++;
-		}
-		//printf("\n");
-	}
-
-	printf("%i", UUE_array[0]-32);
-	printf("\n\n");
+	//printf("%i", UUE_array[0]-32);
+	//printf("\n\n");
 	// %`^H
-	decode_three(decoded_bytes, '%','`','^','H');
 
+	/*
+	// /decode_three(decoded_bytes, '%','`','^','H');
+	int decode_count = 0;
+	int decoded_line_count = 1;
+	int hex_line_format_count = 0;
+	int total_decoded_count = 0;
+	while(decoded_line_count < 6){
+		while(decode_count < 60){
+			if (hex_line_format_count > 14)
+			{
+				printf("\n");
+				hex_line_format_count=0;
+			}
+			decode_three(decoded_bytes, UUE_array[total_decoded_count+1], UUE_array[total_decoded_count+2],UUE_array[total_decoded_count+3],UUE_array[total_decoded_count+4]);	
+			decode_count+=4;
+			total_decoded_count+=4;
+			hex_line_format_count+=3;
+		}
+		total_decoded_count+=2;
+		decode_count=0;
+		decoded_line_count++;
+	}
+	*/
+	
+	
+	//decode_three(decoded_bytes, UUE_array[5], UUE_array[6],UUE_array[7],UUE_array[8]);
+	//decode_three(decoded_bytes, UUE_array[9], UUE_array[10],UUE_array[11],UUE_array[12]);
+	//decode_three(decoded_bytes, UUE_array[13], UUE_array[14],UUE_array[15],UUE_array[16]);
+	//decode_three(decoded_bytes, UUE_array[17], UUE_array[18],UUE_array[19],UUE_array[20]);
+	//decode_three(decoded_bytes, UUE_array[21], UUE_array[22],UUE_array[23],UUE_array[24]);
 	//printf("\n\n" );
 	shut_down();
 }
@@ -336,7 +358,7 @@ void program_chip(char file_name[])
 
 uint8_t rx(bool parse, bool printOrNot)
 {	
-	printOrNot = true;
+
 	// 0 = unsuccessful, 1 = LPC, 2 = HM-10
 	int device_and_success = 0;
 	//FT_SetTimeouts(handle, timeout, 0);
@@ -825,7 +847,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 
 		// 5. Send checksum: "Chk_sum\n"
 		snprintf(checksum_as_string, 10, "%i\n", write_local.UUE_chunk_A_check_sum);
-		tx_chars(checksum_as_string, tx_size_signed(checksum_as_string), PRINT, 0);
+		tx_chars(checksum_as_string, tx_size_signed(checksum_as_string), NO_PRINT, 0);
 		tx_chars("\n", sizeof("\n"), PRINT, 0);
 		Sleep(140);
 	
@@ -871,7 +893,7 @@ struct write write_page_to_ram(struct write write_local, struct Data data_local)
 	while(successful < 3){
 		// 3. Send intent-to-write string.
 		tx_chars(intent_to_write_to_ram_string, tx_size_signed(intent_to_write_to_ram_string), PRINT, 0);
-		tx_chars("\n", sizeof("\n"), NO_PRINT, 0);
+		tx_chars("\n", sizeof("\n"), PRINT, 0);
 		Sleep(300);
 		rx(PARSE, PRINT);
 
@@ -936,8 +958,8 @@ struct write prepare_page_to_write(struct write write_local, struct Data data_lo
 	// 0. Load arrays with FF.
 	for (int i = 0; i < 128; ++i)
 	{
-		HEX_chunkA_array_buf[i] = 0xFF;
-		HEX_chunkB_array_buf[i] = 0xFF;	
+		//HEX_chunkA_array_buf[i] = 0xFF;
+		//HEX_chunkB_array_buf[i] = 0xFF;	
 	}
 
 	// 1. Load hex data into array A & get #bytes.

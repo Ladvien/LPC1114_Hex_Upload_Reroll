@@ -36,8 +36,20 @@ void decode_three(uint8_t * ret, char c0, char c1, char c2, char c3)
 		ret[1] = (uint8_t)((word >> 8) & 0xff);
 		ret[2] = (uint8_t)((word) & 0xff);
 
-	 	printf("%02X %02X %02X\n", ret[0], ret[1], ret[2]);     
+	 	printf("%02X %02X %02X ", ret[0], ret[1], ret[2]);     
  	}
+}
+
+void decode_UUE_line(char UUE_line[], char decoded_HEX_array[])
+{
+
+	int UUE_char_count = 0;
+	int bytes_this_line = (int)UUE_line[UUE_char_count]-32;
+
+	while(bytes_this_line < UUE_char_count){
+		decode_three(decoded_HEX_array, UUE_line[UUE_char_count], UUE_line[UUE_char_count+1], UUE_line[UUE_char_count+2], UUE_line[UUE_char_count+3]);
+		UUE_char_count+=4;
+	}
 }
 
 // Data Handling
@@ -71,7 +83,7 @@ int hex_file_to_array(FILE * file, uint8_t hex_data[])
 
 	int data_count = 0;
 	while (data_count < 32768){
-		hex_data[data_count] = 0xFF;
+		//hex_data[data_count] = 0xFF;
 		data_count++;
 	}
 

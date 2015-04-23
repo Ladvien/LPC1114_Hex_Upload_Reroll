@@ -53,6 +53,7 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 
 // Decode 4 characters from UUE array, convert them to 3 bytes.
 void decode_three(uint8_t * ret, char c0, char c1, char c2, char c3);
+void decode_UUE_line(char UUE_line[], char decoded_HEX_array[]);
 
 // Get checksum of an array.
 int check_sum(uint8_t * hex_data_array, int file_size);

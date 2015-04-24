@@ -52,6 +52,24 @@ void decode_UUE_line(char UUE_line[], char decoded_HEX_array[])
 	}
 }
 
+
+void get_UUE_line_from_array(char UUE_line, char uue_data[]){
+
+}
+
+void get_UUE_file_into_array(FILE * file, char uue_data[]){
+	int file_index = 0;
+	int file_size = 0;
+
+	file_size = file_sizer(file);
+
+	while(file_index < file_size){
+		uue_data[file_index] = fgetc (file);
+		printf("%c", uue_data[file_index]);
+		file_index++;		
+	}
+}
+
 // Data Handling
 int hex_file_to_array(FILE * file, uint8_t hex_data[])
 {

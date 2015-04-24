@@ -30,6 +30,8 @@ char file_name[40];
 FILE *hexDataFile;
 FILE *UUEDataFile;
 FILE *debug;
+FILE *UUE_debug;
+
 
 //Reading characters from a file.
 uint8_t charToPut;
@@ -133,7 +135,7 @@ void debug_hex_file(char file_name[])
 	// Array for decoded chunk.
 	uint8_t decoded_bytes[3];
 
-
+	UUE_debug = open_file ("uueFile.deb", "r" );
 	debug = open_file ("debug.hex", "w" );
 	UUEDataFile = open_file ("uueFile.uue", "w" );
 	hexDataFile = open_file ("hexFile.hex", "w" );
@@ -199,12 +201,14 @@ void debug_hex_file(char file_name[])
 	// 4. Repeat 1-3 for all encoded lines in the UUE file.
 	// 5. Format hex data into HEX file format.
 
+	char UUE_array_to_decode[32768];
+
 	// 0. Open the uueFile.deb file.
-	hexDataFile = open_file ("uueFile.deb", "r" );
 
 	// Loop
-		// 1. Get a line from the file and put it into a string.
 
+	// 1. Get a line from the file and put it into a string.
+	get_UUE_line_from_file(UUE_debug, UUE_array_to_decode);
 
 	//printf("%i", UUE_array[0]-32);
 	//printf("\n\n");
@@ -250,6 +254,7 @@ void shut_down()
 	fclose ( hexDataFile );
 	fclose ( debug );
 	fclose ( UUEDataFile );
+	fclose ( UUE_debug );
 	clearConsole();
 	printf("\n\"Hot glue!!\" --Hoff70\n  1968 - 2015\n");
 	//printf("In memory of Johnathan Hoffman\n1968 - 2015\n");

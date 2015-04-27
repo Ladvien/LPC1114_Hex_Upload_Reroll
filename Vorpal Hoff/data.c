@@ -62,19 +62,15 @@ void get_UUE_line_from_array(char UUE_line[], char uue_data[], bool reset){
 	static int index = 0;
 	if(reset){index = 0;}
 	int bytes_this_line = ((int)uue_data[index]-32)*1.333;
-
-	bytes_this_line++;
-
+	bytes_this_line+=3;
 	printf("%i\n", bytes_this_line);
 	int instance_index = 0;
 
 	while(instance_index < bytes_this_line){
-		UUE_line[instance_index] = uue_data[index+1];
+		UUE_line[instance_index] = uue_data[index];
 		instance_index++;
 		index++;
 	}
-	index+=2;
-
 }
 
 void get_UUE_file_into_array(FILE * file, char uue_data[]){

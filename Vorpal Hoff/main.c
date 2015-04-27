@@ -202,7 +202,7 @@ void debug_hex_file(char file_name[])
 	// 5. Format hex data into HEX file format.
 
 	char UUE_array_to_decode[32768];
-	char UUE_line_buffer[60];
+	char UUE_line_buffer[62];
 	uint8_t decoded_HEX_array[45];
 
 	// 0. Open the uueFile.deb file.
@@ -217,7 +217,8 @@ void debug_hex_file(char file_name[])
 	int UUE_line_counter = 0;
 
 	get_UUE_line_from_array(UUE_line_buffer, UUE_array_to_decode, false);
-	for (int i = 0; i < 60; ++i)
+
+	for (int i = 0; i < 62; ++i)
 	{
 		printf("%c", UUE_line_buffer[i]);
 	}
@@ -227,8 +228,7 @@ void debug_hex_file(char file_name[])
 	//bytes_this_line = (int)(UUE_array_to_decode[0]-32);
 	//decode_UUE_line(UUE_array_to_decode, decoded_HEX_array);
 
-
-	for (int i = 0; i < 60; ++i)
+	for (int i = 0; i < 62; ++i)
 	{
 		printf("%c", UUE_line_buffer[i]);
 	}

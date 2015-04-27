@@ -73,6 +73,7 @@ void get_UUE_line_from_array(char UUE_line[], char uue_data[], bool reset){
 		instance_index++;
 		index++;
 	}
+	index+=2;
 
 }
 

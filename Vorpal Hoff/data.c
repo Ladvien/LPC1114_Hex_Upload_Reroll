@@ -57,13 +57,13 @@ void decode_UUE_line(char UUE_line[], char decoded_HEX_array[])
 }
 
 
-void get_UUE_line_from_array(char UUE_line[], char uue_data[], bool reset){
+int get_UUE_line_from_array(char UUE_line[], char uue_data[], bool reset){
 
 	static int index = 0;
 	if(reset){index = 0;}
-	int bytes_this_line = ((int)uue_data[index]-32)*1.333;
-	bytes_this_line+=3;
-	printf("%i\n", bytes_this_line);
+	int bytes_this_line = (int)ceil(((uue_data[index]-32)*1.3333333));
+	bytes_this_line+=1;
+
 	int instance_index = 0;
 
 	while(instance_index < bytes_this_line){
@@ -71,19 +71,30 @@ void get_UUE_line_from_array(char UUE_line[], char uue_data[], bool reset){
 		instance_index++;
 		index++;
 	}
+	index++;
+	return bytes_this_line;
 }
 
-void get_UUE_file_into_array(FILE * file, char uue_data[]){
+int get_UUE_file_into_array(FILE * file, char uue_data[]){
 	int file_index = 0;
 	int file_size = 0;
 
 	file_size = file_sizer(file);
 
+	int new_line_counter = 0;
+
 	while(file_index < file_size){
 		uue_data[file_index] = fgetc (file);
 		printf("%c", uue_data[file_index]);
-		file_index++;		
+		if(uue_data[file_index] == '\n'){
+			new_line_counter++;
+			printf("Line #%i: ", new_line_counter);
+		}
+		file_index++;			
 	}
+
+	// the output file has an extra LF at the end.  We subtract it.
+	return new_line_counter-1;
 }
 
 // Data Handling

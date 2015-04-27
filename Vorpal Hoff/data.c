@@ -46,6 +46,10 @@ void decode_UUE_line(char UUE_line[], char decoded_HEX_array[])
 	int UUE_char_count = 0;
 	int bytes_this_line = (int)UUE_line[UUE_char_count]-32;
 
+	printf("%i\n", bytes_this_line);
+
+	Sleep(5000);
+
 	while(bytes_this_line < UUE_char_count){
 		decode_three(decoded_HEX_array, UUE_line[UUE_char_count], UUE_line[UUE_char_count+1], UUE_line[UUE_char_count+2], UUE_line[UUE_char_count+3]);
 		UUE_char_count+=4;
@@ -53,7 +57,22 @@ void decode_UUE_line(char UUE_line[], char decoded_HEX_array[])
 }
 
 
-void get_UUE_line_from_array(char UUE_line, char uue_data[]){
+void get_UUE_line_from_array(char UUE_line[], char uue_data[], bool reset){
+
+	static int index = 0;
+	if(reset){index = 0;}
+	int bytes_this_line = ((int)uue_data[index]-32)*1.333;
+
+	bytes_this_line++;
+
+	printf("%i\n", bytes_this_line);
+	int instance_index = 0;
+
+	while(instance_index < bytes_this_line){
+		UUE_line[instance_index] = uue_data[index+1];
+		instance_index++;
+		index++;
+	}
 
 }
 

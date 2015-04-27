@@ -53,7 +53,7 @@ int UUEncode(uint8_t * UUE_data_array, uint8_t * hex_data_array, int hex_data_ar
 
 // Decode 4 characters from UUE array, convert them to 3 bytes.
 void get_UUE_file_into_array(FILE * file, char uue_data[]);
-void get_UUE_line_from_array(char UUE_line, char uue_data[]);
+void get_UUE_line_from_array(char UUE_line[], char uue_data[], bool reset);
 void decode_UUE_line(char UUE_line[], char decoded_HEX_array[]);
 void decode_three(uint8_t * ret, char c0, char c1, char c2, char c3);
 

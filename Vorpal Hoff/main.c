@@ -212,16 +212,16 @@ void debug_hex_file(char file_name[])
 	// 1. Get a line from the file and put it into a string.
 	int line_count = get_UUE_file_into_array(UUE_debug, UUE_array_to_decode);
 
-
-	printf("Line count: %i\n", line_count);
-
 	// 2. Call decode_line() on the encoded string.
 	int new_line_counter = 0;
 	int UUE_char_on_line_index = 0;
 	int UUE_chars_this_line = 0;
 
+	printf("\n\n\n");
+
 	while(new_line_counter < line_count){
 		UUE_chars_this_line = get_UUE_line_from_array(UUE_line_buffer, UUE_array_to_decode, false);
+		decode_UUE_line(UUE_array_to_decode, decoded_HEX_array);
 		printf("Line #%i: ", new_line_counter);
 		while(UUE_char_on_line_index < UUE_chars_this_line)
 		{

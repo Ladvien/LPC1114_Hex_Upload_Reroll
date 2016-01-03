@@ -11,3 +11,4 @@ This is my attempt to re-roll the lpc21isp. Though, I'm not kidding myself, this
 
 I got a little burnt; there seems no way, given current lpc21isp driver dependency, to control CTS on the FTDI.  And I'd love to see the LPC1114 have cheap support.  If CTS and DTR can be used then anyone who has the equipment to program an Arduino Pro Mini or Lilypad can program the LPC1114.  Without having to buy extra programmer then an LPC1114 could be as easy to upload as Arduino and cost a little more than an Arduino Pro Mini (~$5).  Worth it.  
 
+<a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc/4.0/88x31.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons Attribution-NonCommercial 4.0 International License</a>.
